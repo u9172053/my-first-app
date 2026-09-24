@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
-import { StoryInteractions } from "@/components/StoryInteractions";
+import { StoryReader } from "@/components/StoryReader";
 
 export default async function StoryPage({
   params,
@@ -55,15 +55,7 @@ export default async function StoryPage({
         </h1>
       </div>
 
-      <article className="whitespace-pre-line rounded-xl border border-orange-200 bg-white p-6 text-lg leading-loose">
-        {story.body}
-      </article>
-
-      <StoryInteractions
-        storyId={story.id}
-        text={story.body}
-        audioUrl={story.audioUrl}
-      />
+      <StoryReader storyId={story.id} body={story.body} audioUrl={story.audioUrl} />
     </div>
   );
 }
