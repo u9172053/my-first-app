@@ -1,0 +1,99 @@
+// Prisma schema for ラズキッズ日本語版 (leveled reading app)
+// 開発環境: SQLite / 本番運用時は PostgreSQL 等に切り替え可能
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum SubscriptionStatus {
+  NONE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+
+  stripeCustomerId     String?             @unique
+  stripeSubscriptionId String?             @unique
+  subscriptionStatus   SubscriptionStatus  @default(NONE)
+  currentPeriodEnd     DateTime?
+
+  progress QuizAttempt[]
+  readingProgress ReadingProgress[]
+}
+
+model Level {
+  id     String  @id @default(cuid())
+  code   String  @unique // 例: "L1", "L2" ...
+  title  String  // 例: "レベル1（ひらがな・かんたん）"
+  order  Int
+  isFree Boolean @default(false) // true なら無料開放レベル
+
+  stories Story[]
+}
+
+model Story {
+  id      String @id @default(cuid())
+  levelId String
+  level   Level  @relation(fields: [levelId], references: [id], onDelete: Cascade)
+
+  title    String
+  body     String // 本文（日本語テキスト）
+  audioUrl String? // 将来の本物の音声ファイルURL（未設定ならブラウザTTSを使用）
+  order    Int
+
+  questions       QuizQuestion[]
+  readingProgress ReadingProgress[]
+}
+
+model QuizQuestion {
+  id      String @id @default(cuid())
+  storyId String
+  story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  question     String
+  choices      String // JSON文字列化した選択肢配列
+  correctIndex Int
+  order        Int
+
+  attempts QuizAttempt[]
+}
+
+model QuizAttempt {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  selectedIndex Int
+  isCorrect     Boolean
+  createdAt     DateTime @default(now())
+}
+
+model ReadingProgress {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storyId String
+  story   Story  @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  listened      Boolean  @default(false)
+  readAloudDone Boolean  @default(false)
+  quizScore     Int? // 正答数
+  quizTotal     Int? // 出題数
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, storyId])
+}
