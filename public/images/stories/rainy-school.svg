@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="rainSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6C757D"/>
+      <stop offset="50%" stop-color="#8D99AE"/>
+      <stop offset="100%" stop-color="#D8E2DC"/>
+    </linearGradient>
+    <linearGradient id="umbrellaGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FF4D6D"/>
+      <stop offset="20%" stop-color="#FF70A6"/>
+      <stop offset="40%" stop-color="#FF9F1C"/>
+      <stop offset="60%" stop-color="#2EC4B6"/>
+      <stop offset="80%" stop-color="#3A86FF"/>
+      <stop offset="100%" stop-color="#8338EC"/>
+    </linearGradient>
+    <linearGradient id="puddleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A2D2FF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#BDE0FE" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="800" height="500" fill="url(#rainSky)"/>
+
+  <!-- Rain Drops Pattern -->
+  <g stroke="#E0F2FE" stroke-width="2" opacity="0.6" stroke-linecap="round">
+    <line x1="50" y1="30" x2="30" y2="80"/>
+    <line x1="120" y1="10" x2="100" y2="60"/>
+    <line x1="220" y1="50" x2="200" y2="100"/>
+    <line x1="310" y1="20" x2="290" y2="70"/>
+    <line x1="420" y1="40" x2="400" y2="90"/>
+    <line x1="530" y1="10" x2="510" y2="60"/>
+    <line x1="640" y1="50" x2="620" y2="100"/>
+    <line x1="730" y1="20" x2="710" y2="70"/>
+
+    <line x1="80" y1="150" x2="60" y2="200"/>
+    <line x1="180" y1="130" x2="160" y2="180"/>
+    <line x1="270" y1="170" x2="250" y2="220"/>
+    <line x1="380" y1="140" x2="360" y2="190"/>
+    <line x1="490" y1="160" x2="470" y2="210"/>
+    <line x1="590" y1="120" x2="570" y2="170"/>
+    <line x1="700" y1="150" x2="680" y2="200"/>
+
+    <line x1="40" y1="280" x2="20" y2="330"/>
+    <line x1="150" y1="260" x2="130" y2="310"/>
+    <line x1="750" y1="270" x2="730" y2="320"/>
+  </g>
+
+  <!-- Distant School Building -->
+  <g id="school-building" transform="translate(520, 180)">
+    <!-- Main Structure -->
+    <rect x="0" y="60" width="220" height="140" fill="#E0A96D" rx="4"/>
+    <!-- Roof -->
+    <path d="M -10,60 L 110,10 L 230,60 Z" fill="#8C2F39"/>
+    <!-- Clock Tower -->
+    <rect x="85" y="-10" width="50" height="70" fill="#E0A96D"/>
+    <polygon points="80,-10 110,-40 140,-10" fill="#8C2F39"/>
+    <circle cx="110" cy="15" r="14" fill="#FFFFFF" stroke="#8C2F39" stroke-width="3"/>
+    <!-- Clock hands -->
+    <line x1="110" y1="15" x2="110" y2="7" stroke="#333" stroke-width="2"/>
+    <line x1="110" y1="15" x2="117" y2="15" stroke="#333" stroke-width="2"/>
+    <!-- Windows -->
+    <rect x="20" y="80" width="30" height="35" fill="#FFF" stroke="#A86B32" stroke-width="2"/>
+    <rect x="70" y="80" width="30" height="35" fill="#FFF" stroke="#A86B32" stroke-width="2"/>
+    <rect x="120" y="80" width="30" height="35" fill="#FFF" stroke="#A86B32" stroke-width="2"/>
+    <rect x="170" y="80" width="30" height="35" fill="#FFF" stroke="#A86B32" stroke-width="2"/>
+    <!-- Door -->
+    <rect x="90" y="140" width="40" height="60" fill="#6B4226"/>
+  </g>
+
+  <!-- Friend waving at school entrance -->
+  <g id="friend-waving" transform="translate(500, 310)">
+    <circle cx="0" cy="0" r="12" fill="#FFE0B2"/> <!-- Head -->
+    <path d="M -12,-5 Q 0,-18 12,-5 Z" fill="#5D4037"/> <!-- Hair -->
+    <rect x="-10" y="12" width="20" height="28" fill="#42A5F5" rx="4"/> <!-- Clothes -->
+    <line x1="10" y1="15" x2="25" y2="-5" stroke="#FFE0B2" stroke-width="5" stroke-linecap="round"/> <!-- Waving arm -->
+    <!-- Speech Bubble "おはよう" -->
+    <g transform="translate(-70, -45)">
+      <rect x="0" y="0" width="70" height="28" fill="#FFFFFF" rx="10" stroke="#42A5F5" stroke-width="2"/>
+      <polygon points="50,28 60,35 55,28" fill="#FFFFFF"/>
+      <text x="35" y="18" font-size="12" font-weight="bold" fill="#1E88E5" text-anchor="middle" font-family="sans-serif">おはよう</text>
+    </g>
+  </g>
+
+  <!-- Road / Sidewalk -->
+  <path d="M 0,340 C 250,330 450,350 800,320 L 800,500 L 0,500 Z" fill="#9E9E9E"/>
+  <path d="M 0,380 C 250,370 450,390 800,360" stroke="#757575" stroke-width="6" stroke-dasharray="30 20" fill="none"/>
+
+  <!-- Puddle on the Road -->
+  <ellipse cx="280" cy="420" rx="110" ry="35" fill="url(#puddleGrad)" stroke="#E0F2FE" stroke-width="3"/>
+  <!-- Water ripples -->
+  <ellipse cx="260" cy="415" rx="40" ry="12" stroke="#FFFFFF" stroke-width="2" fill="none" opacity="0.7"/>
+  <ellipse cx="300" cy="425" rx="25" ry="8" stroke="#FFFFFF" stroke-width="1.5" fill="none" opacity="0.5"/>
+
+  <!-- Taro Boy Walking carefully avoiding puddle -->
+  <g id="taro-boy" transform="translate(180, 230)">
+    <!-- Yellow Raincoat & Boots Body -->
+    <!-- Legs in Yellow Rain Boots -->
+    <rect x="30" y="160" width="14" height="40" fill="#FFB703" rx="4"/>
+    <rect x="55" y="160" width="14" height="40" fill="#FFB703" rx="4"/>
+    <!-- Yellow Boots -->
+    <path d="M 25,190 L 45,190 Q 50,200 45,205 L 25,205 Z" fill="#FF0000"/>
+    <path d="M 55,190 L 75,190 Q 80,200 75,205 L 55,205 Z" fill="#FF0000"/>
+
+    <!-- Coat Body -->
+    <path d="M 20,100 L 80,100 L 90,165 Q 50,175 10,165 Z" fill="#FFD166"/>
+    <!-- Coat Buttons -->
+    <circle cx="50" cy="115" r="4" fill="#E76F51"/>
+    <circle cx="50" cy="135" r="4" fill="#E76F51"/>
+    <circle cx="50" cy="155" r="4" fill="#E76F51"/>
+
+    <!-- School Bag (Randoseru) on back -->
+    <rect x="0" y="105" width="22" height="42" fill="#D90429" rx="5"/>
+
+    <!-- Head & Face -->
+    <circle cx="50" cy="70" r="30" fill="#FCEADE"/>
+    <!-- Black Hair -->
+    <path d="M 22,65 Q 50,30 78,65 Q 70,45 50,48 Q 30,45 22,65 Z" fill="#2B2D42"/>
+
+    <!-- Cheerful Face -->
+    <circle cx="42" cy="72" r="4" fill="#2B2D42"/>
+    <circle cx="62" cy="72" r="4" fill="#2B2D42"/>
+    <circle cx="43" cy="70" r="1.5" fill="#FFF"/>
+    <circle cx="63" cy="70" r="1.5" fill="#FFF"/>
+    <path d="M 48,82 Q 52,88 56,82" stroke="#2B2D42" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <ellipse cx="36" cy="78" rx="5" ry="3" fill="#FF8FA3" opacity="0.6"/>
+    <ellipse cx="68" cy="78" rx="5" ry="3" fill="#FF8FA3" opacity="0.6"/>
+
+    <!-- Holding Rainbow Umbrella -->
+    <!-- Umbrella Shaft & Handle -->
+    <line x1="50" y1="110" x2="50" y2="10" stroke="#495057" stroke-width="5" stroke-linecap="round"/>
+    <path d="M 50,120 Q 50,135 38,130" stroke="#495057" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+    <!-- Umbrella Canopy -->
+    <g transform="translate(50, 15)">
+      <path d="M -90,15 C -90,-60 90,-60 90,15 C 60,5 30,15 0,5 C -30,15 -60,5 -90,15 Z" fill="url(#umbrellaGrad)"/>
+      <path d="M -90,15 Q -45,-50 0,5" stroke="#FFFFFF" stroke-width="1.5" fill="none" opacity="0.4"/>
+      <path d="M 90,15 Q 45,-50 0,5" stroke="#FFFFFF" stroke-width="1.5" fill="none" opacity="0.4"/>
+      <!-- Top finial -->
+      <polygon points="0,-50 -6,-40 6,-40" fill="#FF4D6D"/>
+    </g>
+  </g>
+</svg>
