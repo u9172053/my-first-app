@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="spaceBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B092B"/>
+      <stop offset="40%" stop-color="#12103E"/>
+      <stop offset="80%" stop-color="#050515"/>
+      <stop offset="100%" stop-color="#000005"/>
+    </linearGradient>
+
+    <radialGradient id="earthGrad" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#4CC9F0"/>
+      <stop offset="40%" stop-color="#4361EE"/>
+      <stop offset="80%" stop-color="#3F37C9"/>
+      <stop offset="100%" stop-color="#10002B"/>
+    </radialGradient>
+
+    <linearGradient id="atmosphereGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7209B7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#4CC9F0" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Deep Space Background -->
+  <rect width="800" height="500" fill="url(#spaceBg)"/>
+
+  <!-- Twinkling Stars -->
+  <g fill="#FFFFFF">
+    <circle cx="80" cy="60" r="1.5" opacity="0.9"/>
+    <circle cx="150" cy="180" r="2" opacity="0.8"/>
+    <circle cx="220" cy="80" r="1" opacity="0.6"/>
+    <circle cx="310" cy="40" r="2.5" opacity="1"/>
+    <circle cx="420" cy="120" r="1.5" opacity="0.7"/>
+    <circle cx="530" cy="50" r="2" opacity="0.9"/>
+    <circle cx="640" cy="110" r="1" opacity="0.5"/>
+    <circle cx="750" cy="70" r="2.5" opacity="0.9"/>
+    <circle cx="710" cy="220" r="1.5" opacity="0.8"/>
+
+    <circle cx="50" cy="300" r="2" opacity="0.7"/>
+    <circle cx="120" cy="420" r="1" opacity="0.5"/>
+    <circle cx="260" cy="360" r="2" opacity="0.8"/>
+    <circle cx="380" cy="440" r="1.5" opacity="0.6"/>
+    <circle cx="730" cy="380" r="2" opacity="0.9"/>
+
+    <!-- Big 4-point Star -->
+    <path d="M 310,30 L 313,40 L 323,43 L 313,46 L 310,56 L 307,46 L 297,43 L 307,40 Z" fill="#FFD166"/>
+    <path d="M 750,60 L 752,67 L 759,69 L 752,71 L 750,78 L 748,71 L 741,69 L 748,67 Z" fill="#4CC9F0"/>
+  </g>
+
+  <!-- Distant Colorful Nebula Glow -->
+  <circle cx="650" cy="150" r="180" fill="#7209B7" opacity="0.15"/>
+  <circle cx="180" cy="350" r="160" fill="#F72585" opacity="0.12"/>
+
+  <!-- Beautiful Glowing Blue Earth -->
+  <g id="earth" transform="translate(140, 100)">
+    <!-- Earth Outer Glow -->
+    <circle cx="160" cy="160" r="175" fill="#4CC9F0" opacity="0.2"/>
+    <circle cx="160" cy="160" r="165" fill="#4361EE" opacity="0.3"/>
+
+    <!-- Earth Base Globe -->
+    <circle cx="160" cy="160" r="160" fill="url(#earthGrad)"/>
+
+    <!-- Green/Emerald Continents -->
+    <g fill="#3A5A40" opacity="0.85">
+      <!-- Asia / Japan archipelago area -->
+      <path d="M 120,80 Q 150,60 190,90 Q 220,110 200,150 Q 160,180 130,140 Z"/>
+      <!-- Japan islands curve -->
+      <path d="M 210,100 Q 225,90 230,110 Q 215,125 210,100" fill="#588157"/>
+      <!-- Australia / Oceania area -->
+      <path d="M 210,210 Q 250,200 260,240 Q 220,270 190,240 Z"/>
+      <!-- Americas edge -->
+      <path d="M 40,120 Q 80,100 70,180 Q 30,220 20,150 Z"/>
+    </g>
+
+    <!-- Swirly White Clouds -->
+    <g fill="#FFFFFF" opacity="0.75">
+      <path d="M 80,100 Q 130,80 180,110 Q 230,130 200,140 Q 140,120 80,100 Z"/>
+      <path d="M 130,180 Q 190,160 250,190 Q 280,210 230,220 Q 170,200 130,180 Z"/>
+      <path d="M 50,220 Q 100,200 150,230 Q 120,250 60,240 Z"/>
+      <!-- Polar ice cap -->
+      <path d="M 80,25 C 120,10 200,10 240,25 C 200,50 120,50 80,25 Z"/>
+    </g>
+  </g>
+
+  <!-- Kenta Astronaut Boy Floating in Space -->
+  <g id="astronaut-kenta" transform="translate(480, 140)">
+    <!-- Spacesuit Tether Hose -->
+    <path d="M 180,220 Q 240,280 300,320" stroke="#E0E1DD" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M 180,220 Q 240,280 300,320" stroke="#7209B7" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+    <!-- Spacesuit Body -->
+    <!-- Backpack (Life Support) -->
+    <rect x="20" y="80" width="45" height="110" fill="#E0E1DD" rx="12"/>
+    <rect x="15" y="90" width="10" height="90" fill="#4CC9F0" rx="4"/>
+
+    <!-- Suit Torso -->
+    <rect x="50" y="85" width="90" height="100" fill="#F8F9FA" rx="25"/>
+    <!-- Chest Control Panel -->
+    <rect x="70" y="105" width="50" height="35" fill="#1D3557" rx="6"/>
+    <circle cx="82" cy="118" r="5" fill="#E63946"/>
+    <circle cx="97" cy="118" r="5" fill="#4CC9F0"/>
+    <circle cx="107" cy="118" r="3" fill="#FFD166"/>
+    <!-- Flag / Patch -->
+    <rect x="70" y="148" width="22" height="14" fill="#0077B6" rx="2"/>
+    <circle cx="81" cy="155" r="4" fill="#E63946"/>
+
+    <!-- Suit Arms (Floating weightlessly) -->
+    <!-- Left Arm -->
+    <path d="M 60,95 Q 10,70 0,110 Q 20,125 55,115 Z" fill="#F8F9FA"/>
+    <!-- Glove -->
+    <circle cx="-2" cy="112" r="14" fill="#4CC9F0"/>
+
+    <!-- Right Arm (Hand reaching towards Earth/Viewer) -->
+    <path d="M 130,95 Q 180,80 190,120 Q 165,135 130,115 Z" fill="#F8F9FA"/>
+    <!-- Glove waving -->
+    <circle cx="192" cy="122" r="14" fill="#4CC9F0"/>
+
+    <!-- Suit Legs -->
+    <path d="M 65,180 L 55,250 Q 75,260 85,250 L 90,180 Z" fill="#F8F9FA"/>
+    <path d="M 100,180 L 105,250 Q 125,260 135,250 L 125,180 Z" fill="#F8F9FA"/>
+    <!-- Boots -->
+    <rect x="50" y="248" width="38" height="20" fill="#1D3557" rx="8"/>
+    <rect x="102" y="248" width="38" height="20" fill="#1D3557" rx="8"/>
+
+    <!-- Astronaut Helmet -->
+    <circle cx="95" cy="55" r="52" fill="#F8F9FA"/>
+    <!-- Gold/Blue Reflective Visor -->
+    <ellipse cx="100" cy="55" rx="38" ry="32" fill="#10002B"/>
+    <ellipse cx="100" cy="55" rx="35" ry="29" fill="url(#atmosphereGlow)"/>
+
+    <!-- Kenta's Happy Face Visible inside Helmet -->
+    <g transform="translate(100, 55)">
+      <!-- Face -->
+      <circle cx="0" cy="2" r="22" fill="#FFE0B2"/>
+      <!-- Brown Hair -->
+      <path d="M -20,-5 Q 0,-26 20,-5 Q 10,-18 0,-15 Q -10,-18 -20,-5 Z" fill="#4A2810"/>
+      <!-- Cheerful Eyes looking at Earth -->
+      <circle cx="-8" cy="2" r="3.5" fill="#10002B"/>
+      <circle cx="10" cy="2" r="3.5" fill="#10002B"/>
+      <circle cx="-7" cy="0" r="1.5" fill="#FFF"/>
+      <circle cx="11" cy="0" r="1.5" fill="#FFF"/>
+      <!-- Smile -->
+      <path d="M -8,12 Q 1,19 10,12" stroke="#10002B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-13" cy="8" rx="4" ry="2.5" fill="#FF8FA3" opacity="0.7"/>
+      <ellipse cx="15" cy="8" rx="4" ry="2.5" fill="#FF8FA3" opacity="0.7"/>
+    </g>
+
+    <!-- Visor Glare Reflection -->
+    <path d="M 72,35 Q 85,28 115,30 Q 85,40 72,35 Z" fill="#FFFFFF" opacity="0.6"/>
+  </g>
+</svg>

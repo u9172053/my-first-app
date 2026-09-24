@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="skyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#73D2DE"/>
+      <stop offset="60%" stop-color="#A5F8D3"/>
+      <stop offset="100%" stop-color="#F3FFB6"/>
+    </linearGradient>
+    <linearGradient id="fieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9EF01A"/>
+      <stop offset="100%" stop-color="#38B000"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Sky -->
+  <rect width="800" height="500" fill="url(#skyGrad)"/>
+
+  <!-- Sun & Clouds -->
+  <circle cx="700" cy="80" r="45" fill="#FFD166"/>
+  <path d="M 640,90 Q 640,60 670,60 Q 690,40 720,50 Q 750,40 760,70 Q 780,70 780,90 Z" fill="#FFFFFF" opacity="0.6"/>
+  <path d="M 100,100 Q 120,70 150,70 Q 170,50 200,60 Q 230,60 240,80 Q 260,90 250,110 Z" fill="#FFFFFF" opacity="0.85"/>
+
+  <!-- Vegetable Farm Hills -->
+  <path d="M -50,320 Q 200,240 450,300 T 850,260 L 850,500 L -50,500 Z" fill="#70E000"/>
+  <path d="M -50,360 Q 150,310 380,370 T 850,330 L 850,500 L -50,500 Z" fill="url(#fieldGrad)"/>
+
+  <!-- Farm Cabbage / Lettuce patch -->
+  <g id="cabbage-patch" transform="translate(50, 390)">
+    <circle cx="40" cy="40" r="22" fill="#2B9348"/>
+    <circle cx="40" cy="40" r="15" fill="#55A630"/>
+    <circle cx="100" cy="50" r="25" fill="#2B9348"/>
+    <circle cx="100" cy="50" r="17" fill="#55A630"/>
+    <!-- Carrots top visible -->
+    <path d="M 650,40 L 655,20 L 660,40 M 653,40 L 645,25 L 658,40" stroke="#2B9348" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="655" cy="45" rx="10" ry="5" fill="#FF6B6B"/>
+  </g>
+
+  <!-- Jump Action Motion Lines -->
+  <path d="M 330,420 Q 300,340 360,200" stroke="#FFD166" stroke-width="6" stroke-dasharray="12 8" fill="none" stroke-linecap="round"/>
+  <path d="M 360,430 Q 330,350 390,210" stroke="#FF9F1C" stroke-width="4" stroke-dasharray="10 8" fill="none" stroke-linecap="round"/>
+  <path d="M 310,210 L 290,200 M 320,180 L 295,165 M 430,170 L 450,155 M 440,200 L 465,190" stroke="#FF9F1C" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Clapping Squirrel Friend -->
+  <g id="squirrel" transform="translate(580, 270)">
+    <!-- Tail -->
+    <path d="M 90,90 Q 160,70 140,0 Q 90,-20 80,40 Q 75,70 90,90 Z" fill="#D97706"/>
+    <path d="M 95,80 Q 140,60 125,10 Q 95,-5 85,40 Z" fill="#FBBF24"/>
+    <!-- Body -->
+    <ellipse cx="60" cy="110" rx="35" ry="40" fill="#D97706"/>
+    <ellipse cx="60" cy="112" rx="22" ry="26" fill="#FEF3C7"/>
+    <!-- Head -->
+    <circle cx="50" cy="60" r="30" fill="#D97706"/>
+    <!-- Ears -->
+    <path d="M 35,35 L 30,15 L 45,30 Z" fill="#D97706"/>
+    <path d="M 55,32 L 65,12 L 68,32 Z" fill="#D97706"/>
+    <!-- Face -->
+    <ellipse cx="40" cy="65" rx="12" ry="10" fill="#FEF3C7"/>
+    <circle cx="38" cy="55" r="4" fill="#1F2937"/>
+    <circle cx="58" cy="55" r="4" fill="#1F2937"/>
+    <circle cx="39" cy="53" r="1.5" fill="#FFF"/>
+    <circle cx="59" cy="53" r="1.5" fill="#FFF"/>
+    <ellipse cx="48" cy="62" rx="4" ry="3" fill="#4B5563"/>
+    <!-- Clapping Hands -->
+    <ellipse cx="25" cy="80" rx="8" ry="6" fill="#FBBF24" transform="rotate(-20 25 80)"/>
+    <ellipse cx="32" cy="78" rx="8" ry="6" fill="#FBBF24" transform="rotate(20 32 78)"/>
+    <!-- Excitement sparkles -->
+    <path d="M 10,40 L 15,45 L 10,50 L 5,45 Z" fill="#FBBF24"/>
+    <path d="M 25,20 L 28,24 L 25,28 L 22,24 Z" fill="#FBBF24"/>
+  </g>
+
+  <!-- Jumping Rabbit (High in the Sky!) -->
+  <g id="rabbit" transform="translate(300, 70)">
+    <!-- Legs extended in jump -->
+    <path d="M 40,150 Q 10,190 -20,180 Q -10,160 30,135 Z" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+    <ellipse cx="-20" cy="180" rx="16" ry="9" fill="#FFB703" transform="rotate(-15 -20 180)"/> <!-- Cute shoe/foot -->
+
+    <path d="M 100,150 Q 130,190 160,180 Q 150,160 110,135 Z" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+    <ellipse cx="160" cy="180" rx="16" ry="9" fill="#FFB703" transform="rotate(15 160 180)"/>
+
+    <!-- Rabbit Body -->
+    <ellipse cx="70" cy="120" rx="45" ry="50" fill="#FFFFFF"/>
+    <!-- Pink Belly -->
+    <ellipse cx="70" cy="125" rx="28" ry="32" fill="#FFE5EC"/>
+
+    <!-- Arms Up in Joy -->
+    <path d="M 30,100 Q -10,70 0,50 Q 15,55 40,85 Z" fill="#FFFFFF"/>
+    <path d="M 110,100 Q 150,70 140,50 Q 125,55 100,85 Z" fill="#FFFFFF"/>
+
+    <!-- Fluffy Tail -->
+    <circle cx="-5" cy="130" r="16" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+
+    <!-- Rabbit Head -->
+    <circle cx="70" cy="50" r="42" fill="#FFFFFF"/>
+
+    <!-- Ears (Big & Expressive) -->
+    <path d="M 50,15 Q 30,-50 45,-60 Q 65,-50 60,10 Z" fill="#FFFFFF"/>
+    <path d="M 50,10 Q 38,-42 46,-50 Q 56,-42 56,8 Z" fill="#FFB7B2"/>
+
+    <path d="M 90,15 Q 110,-50 95,-60 Q 75,-50 80,10 Z" fill="#FFFFFF"/>
+    <path d="M 90,10 Q 102,-42 94,-50 Q 84,-42 84,8 Z" fill="#FFB7B2"/>
+
+    <!-- Eyes (Big Happy Closed Arcs or Bright Eyes) -->
+    <circle cx="52" cy="45" r="6" fill="#1F2937"/>
+    <circle cx="88" cy="45" r="6" fill="#1F2937"/>
+    <circle cx="54" cy="42" r="2" fill="#FFFFFF"/>
+    <circle cx="90" cy="42" r="2" fill="#FFFFFF"/>
+
+    <!-- Cute Nose & Smile -->
+    <polygon points="70,54 64,60 76,60" fill="#FF8FA3"/>
+    <path d="M 70,60 L 70,66 Q 62,72 58,66 M 70,66 Q 78,72 82,66" stroke="#1F2937" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+    <!-- Cheek Blush -->
+    <ellipse cx="42" cy="56" rx="8" ry="5" fill="#FF8FA3" opacity="0.6"/>
+    <ellipse cx="98" cy="56" rx="8" ry="5" fill="#FF8FA3" opacity="0.6"/>
+  </g>
+
+  <!-- Flowers and Grass details in foreground -->
+  <path d="M 0,450 Q 200,420 400,450 T 800,440 L 800,500 L 0,500 Z" fill="#2B9348"/>
+</svg>

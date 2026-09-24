@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#87CEEB"/>
+      <stop offset="60%" stop-color="#E0F6FF"/>
+      <stop offset="100%" stop-color="#B5EAD7"/>
+    </linearGradient>
+    <linearGradient id="treeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2D5A27"/>
+      <stop offset="100%" stop-color="#1E3F1A"/>
+    </linearGradient>
+    <linearGradient id="honeyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#FF8C00"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Sky & Hills -->
+  <rect width="800" height="500" fill="url(#bgGrad)" />
+
+  <!-- Sunbeams -->
+  <path d="M 0,0 L 200,500 L 280,500 Z" fill="#FFFFFF" opacity="0.15"/>
+  <path d="M 0,0 L 450,500 L 550,500 Z" fill="#FFFFFF" opacity="0.12"/>
+  <path d="M 0,0 L 700,500 L 800,500 Z" fill="#FFFFFF" opacity="0.15"/>
+
+  <!-- Distant Trees & Greenery -->
+  <path d="M -50,380 Q 150,280 350,360 T 850,320 L 850,500 L -50,500 Z" fill="#52B788"/>
+  <path d="M -50,400 Q 200,340 450,420 T 850,380 L 850,500 L -50,500 Z" fill="#2D6A4F"/>
+
+  <!-- Big Tree Trunk on the Right -->
+  <path d="M 520,500 C 530,350 480,220 540,120 C 570,70 650,20 700,0 L 800,0 L 800,500 Z" fill="#8B5A2B"/>
+  <path d="M 540,220 C 420,200 380,180 320,180 C 350,210 400,220 520,250 Z" fill="#6F42C1" opacity="0"/> <!-- Branch shadow -->
+  <!-- Branch holding beehive -->
+  <path d="M 550,230 Q 420,210 320,230 Q 300,235 290,240 Q 400,250 530,270 Z" fill="#6E473B"/>
+
+  <!-- Tree Foliage Canopy -->
+  <circle cx="600" cy="80" r="120" fill="url(#treeGrad)"/>
+  <circle cx="720" cy="100" r="100" fill="#276738"/>
+  <circle cx="480" cy="100" r="90" fill="#40916C"/>
+  <circle cx="650" cy="30" r="90" fill="#52B788"/>
+
+  <!-- Beehive hanging on branch -->
+  <!-- Rope -->
+  <line x1="360" y1="225" x2="360" y2="250" stroke="#A67C52" stroke-width="4"/>
+  <!-- Hive layers -->
+  <g id="beehive">
+    <ellipse cx="360" cy="260" rx="35" ry="16" fill="url(#honeyGrad)"/>
+    <ellipse cx="360" cy="275" rx="45" ry="18" fill="#F4A261"/>
+    <ellipse cx="360" cy="292" rx="48" ry="20" fill="url(#honeyGrad)"/>
+    <ellipse cx="360" cy="310" rx="42" ry="18" fill="#F4A261"/>
+    <ellipse cx="360" cy="325" rx="30" ry="14" fill="url(#honeyGrad)"/>
+    <!-- Hive Hole -->
+    <ellipse cx="360" cy="295" rx="10" ry="12" fill="#4A2810"/>
+    <!-- Dripping Honey -->
+    <path d="M 358,325 Q 360,350 362,355 Q 365,360 362,362 Q 358,360 356,345 Z" fill="#FFD700"/>
+  </g>
+
+  <!-- Cute Bees -->
+  <g id="bee1" transform="translate(420, 240)">
+    <ellipse cx="0" cy="0" rx="12" ry="9" fill="#FFD700"/>
+    <path d="M -4,-8 L -4,8 M 2,-9 L 2,9" stroke="#333" stroke-width="3"/>
+    <ellipse cx="-10" cy="-2" rx="3" ry="3" fill="#333"/>
+    <path d="M -2,-8 Q -8,-18 2,-14 Q 6,-10 -2,-8" fill="#E0F7FA" opacity="0.8"/>
+  </g>
+  <g id="bee2" transform="translate(290, 280) scale(0.8)">
+    <ellipse cx="0" cy="0" rx="12" ry="9" fill="#FFD700"/>
+    <path d="M -4,-8 L -4,8 M 2,-9 L 2,9" stroke="#333" stroke-width="3"/>
+    <ellipse cx="10" cy="-2" rx="3" ry="3" fill="#333"/>
+    <path d="M 2,-8 Q 8,-18 -2,-14 Q -6,-10 2,-8" fill="#E0F7FA" opacity="0.8"/>
+  </g>
+
+  <!-- Cute Bear Character -->
+  <g id="bear" transform="translate(180, 220)">
+    <!-- Bear Body -->
+    <ellipse cx="90" cy="210" rx="75" ry="85" fill="#8B4513"/>
+    <!-- Tummy -->
+    <ellipse cx="90" cy="215" rx="50" ry="55" fill="#D2B48C"/>
+
+    <!-- Bear Feet -->
+    <ellipse cx="35" cy="285" rx="25" ry="18" fill="#71360F"/>
+    <ellipse cx="145" cy="285" rx="25" ry="18" fill="#71360F"/>
+    <ellipse cx="35" cy="283" rx="15" ry="10" fill="#D2B48C"/>
+    <ellipse cx="145" cy="283" rx="15" ry="10" fill="#D2B48C"/>
+
+    <!-- Bear Arms (Reaching up lovingly) -->
+    <path d="M 25,170 Q -10,120 40,110 Q 55,130 35,180 Z" fill="#8B4513"/>
+    <path d="M 155,170 Q 200,110 180,80 Q 150,90 140,160 Z" fill="#8B4513"/>
+    <!-- Paw pads -->
+    <circle cx="178" cy="92" r="10" fill="#D2B48C"/>
+
+    <!-- Bear Head -->
+    <circle cx="90" cy="90" r="65" fill="#8B4513"/>
+    <!-- Ears -->
+    <circle cx="38" cy="42" r="22" fill="#8B4513"/>
+    <circle cx="38" cy="42" r="13" fill="#FFC0CB"/>
+    <circle cx="142" cy="42" r="22" fill="#8B4513"/>
+    <circle cx="142" cy="42" r="13" fill="#FFC0CB"/>
+
+    <!-- Snout & Mouth -->
+    <ellipse cx="90" cy="105" rx="28" ry="22" fill="#F5DEB3"/>
+    <ellipse cx="90" cy="94" rx="12" ry="8" fill="#3D2314"/>
+    <path d="M 90,102 L 90,112 Q 80,122 75,114 M 90,112 Q 100,122 105,114" stroke="#3D2314" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+    <!-- Eyes looking UP at hive -->
+    <circle cx="68" cy="80" r="8" fill="#3D2314"/>
+    <circle cx="112" cy="80" r="8" fill="#3D2314"/>
+    <circle cx="70" cy="77" r="3" fill="#FFFFFF"/>
+    <circle cx="114" cy="77" r="3" fill="#FFFFFF"/>
+
+    <!-- Rosy Cheeks -->
+    <ellipse cx="52" cy="98" rx="10" ry="7" fill="#FF80AB" opacity="0.6"/>
+    <ellipse cx="128" cy="98" rx="10" ry="7" fill="#FF80AB" opacity="0.6"/>
+  </g>
+
+  <!-- Grass & Flowers in Foreground -->
+  <path d="M 0,460 Q 200,430 400,460 T 800,450 L 800,500 L 0,500 Z" fill="#38B000"/>
+  <!-- Flowers -->
+  <circle cx="80" cy="460" r="8" fill="#FF4D6D"/>
+  <circle cx="80" cy="460" r="3" fill="#FFEA00"/>
+  <circle cx="650" cy="470" r="10" fill="#7209B7"/>
+  <circle cx="650" cy="470" r="4" fill="#FFEA00"/>
+  <circle cx="720" cy="455" r="8" fill="#FF70A6"/>
+  <circle cx="720" cy="455" r="3" fill="#FFEA00"/>
+</svg>

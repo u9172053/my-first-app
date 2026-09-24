@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" width="100%" height="100%">
+  <defs>
+    <linearGradient id="autumnSky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFD000"/>
+      <stop offset="50%" stop-color="#FF9E00"/>
+      <stop offset="100%" stop-color="#FF7B00"/>
+    </linearGradient>
+    <linearGradient id="stageGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9A7B56"/>
+      <stop offset="100%" stop-color="#6B4D2F"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Autumn Sunset Sky -->
+  <rect width="800" height="500" fill="url(#autumnSky)"/>
+
+  <!-- Golden Autumn Tree Leaves Canopy -->
+  <circle cx="100" cy="80" r="120" fill="#D00000" opacity="0.85"/>
+  <circle cx="250" cy="50" r="100" fill="#DC2F02" opacity="0.85"/>
+  <circle cx="400" cy="30" r="110" fill="#E85D04" opacity="0.85"/>
+  <circle cx="600" cy="60" r="130" fill="#F48C06" opacity="0.85"/>
+  <circle cx="750" cy="90" r="100" fill="#D00000" opacity="0.85"/>
+
+  <!-- Musical Notes Floating in Sky -->
+  <g fill="#FFF" opacity="0.9">
+    <!-- Note 1 -->
+    <path d="M 180,140 Q 200,120 210,130 L 210,160 Q 205,155 195,160 Q 185,165 190,175 Q 195,185 205,180 Q 215,175 215,160 L 215,120 L 180,130 Z"/>
+    <!-- Note 2 -->
+    <path d="M 380,100 L 380,135 Q 375,130 365,135 Q 355,140 360,150 Q 365,160 375,155 Q 385,150 385,135 L 385,100 Z"/>
+    <!-- Note 3 -->
+    <path d="M 620,130 Q 640,110 650,120 L 650,150 Q 645,145 635,150 Q 625,155 630,165 Q 635,175 645,170 Q 655,165 655,150 L 655,110 L 620,120 Z"/>
+  </g>
+
+  <!-- Wooden Concert Stage in Forest -->
+  <ellipse cx="400" cy="400" rx="360" ry="90" fill="url(#stageGrad)" stroke="#4A3319" stroke-width="6"/>
+  <ellipse cx="400" cy="390" rx="350" ry="80" fill="#C68B59"/>
+
+  <!-- Spectator Animals (Bunnies, Birds, Deer silhouettes in background edge) -->
+  <g id="audience" opacity="0.8">
+    <!-- Bird on branch -->
+    <circle cx="720" cy="200" r="12" fill="#3A86FF"/>
+    <path d="M 720,195 L 735,200 L 720,205 Z" fill="#FFD166"/>
+  </g>
+
+  <!-- 1. Squirrel Playing Violin (Left) -->
+  <g id="violin-squirrel" transform="translate(180, 240)">
+    <!-- Big Bushy Tail -->
+    <path d="M -30,80 Q -90,40 -70,-20 Q -20,-40 -30,30 Z" fill="#E65100"/>
+    <path d="M -25,70 Q -70,35 -55,-10 Q -20,-25 -25,30 Z" fill="#FFB74D"/>
+
+    <!-- Body -->
+    <ellipse cx="20" cy="90" rx="28" ry="35" fill="#E65100"/>
+    <ellipse cx="20" cy="92" rx="16" ry="22" fill="#FFE0B2"/>
+
+    <!-- Head -->
+    <circle cx="20" cy="40" r="24" fill="#E65100"/>
+    <ellipse cx="12" cy="45" rx="10" ry="8" fill="#FFE0B2"/>
+    <circle cx="10" cy="36" r="3.5" fill="#212121"/>
+    <circle cx="11" cy="35" r="1" fill="#FFF"/>
+
+    <!-- Ears -->
+    <path d="M 8,20 L 5,0 L 18,16 Z" fill="#E65100"/>
+    <path d="M 28,18 L 32,0 L 35,20 Z" fill="#E65100"/>
+
+    <!-- Violin -->
+    <g transform="translate(15, 35) rotate(-15)">
+      <!-- Violin Body -->
+      <path d="M 15,10 Q 5,20 15,30 Q 8,40 15,50 Q 25,50 25,10 Z" fill="#B76E79" stroke="#5D4037" stroke-width="1.5"/>
+      <!-- Neck & Scroll -->
+      <rect x="25" y="27" width="30" height="6" fill="#3E2723"/>
+      <!-- Violin Bow -->
+      <line x1="5" y1="12" x2="45" y2="48" stroke="#FFE0B2" stroke-width="2.5"/>
+    </g>
+  </g>
+
+  <!-- 2. Bear Playing Taiko Drum (Center) -->
+  <g id="taiko-bear" transform="translate(350, 200)">
+    <!-- Bear Body -->
+    <ellipse cx="50" cy="120" rx="50" ry="55" fill="#6D4C41"/>
+    <ellipse cx="50" cy="125" rx="30" ry="35" fill="#D7CCC8"/>
+
+    <!-- Bear Head -->
+    <circle cx="50" cy="50" r="40" fill="#6D4C41"/>
+    <circle cx="18" cy="20" r="14" fill="#6D4C41"/>
+    <circle cx="18" cy="20" r="8" fill="#F8BBD0"/>
+    <circle cx="82" cy="20" r="14" fill="#6D4C41"/>
+    <circle cx="82" cy="20" r="8" fill="#F8BBD0"/>
+
+    <!-- Snout & Face -->
+    <ellipse cx="50" cy="58" rx="18" ry="14" fill="#D7CCC8"/>
+    <ellipse cx="50" cy="52" rx="8" ry="5" fill="#3E2723"/>
+    <circle cx="34" cy="42" r="5" fill="#3E2723"/>
+    <circle cx="66" cy="42" r="5" fill="#3E2723"/>
+    <circle cx="35" cy="40" r="1.5" fill="#FFF"/>
+    <circle cx="67" cy="40" r="1.5" fill="#FFF"/>
+
+    <!-- Arms Holding Drumsticks (Bachi) -->
+    <path d="M 15,80 L -10,60" stroke="#8D6E63" stroke-width="10" stroke-linecap="round"/>
+    <line x1="-10" y1="60" x2="-25" y2="45" stroke="#FFE0B2" stroke-width="5" stroke-linecap="round"/> <!-- Bachi left -->
+
+    <path d="M 85,80 L 110,60" stroke="#8D6E63" stroke-width="10" stroke-linecap="round"/>
+    <line x1="110" y1="60" x2="125" y2="45" stroke="#FFE0B2" stroke-width="5" stroke-linecap="round"/> <!-- Bachi right -->
+
+    <!-- Taiko Drum in Front -->
+    <g transform="translate(-10, 110)">
+      <!-- Drum Body -->
+      <rect x="15" y="10" width="90" height="70" fill="#B71C1C" rx="10"/>
+      <ellipse cx="60" cy="10" rx="45" ry="15" fill="#FFF8E1" stroke="#5D4037" stroke-width="3"/>
+      <ellipse cx="60" cy="80" rx="45" ry="15" fill="#B71C1C" stroke="#5D4037" stroke-width="3"/>
+      <!-- Drum studs -->
+      <circle cx="25" cy="45" r="3" fill="#FFD54F"/>
+      <circle cx="45" cy="48" r="3" fill="#FFD54F"/>
+      <circle cx="75" cy="48" r="3" fill="#FFD54F"/>
+      <circle cx="95" cy="45" r="3" fill="#FFD54F"/>
+      <!-- Tomoe symbol on drum head -->
+      <circle cx="60" cy="10" r="6" fill="#D32F2F"/>
+    </g>
+  </g>
+
+  <!-- 3. Singing Rabbit (Right) -->
+  <g id="singing-rabbit" transform="translate(540, 230)">
+    <!-- Body -->
+    <ellipse cx="40" cy="100" rx="30" ry="38" fill="#FFFFFF"/>
+    <ellipse cx="40" cy="103" rx="18" ry="24" fill="#FFCDD2"/>
+
+    <!-- Head -->
+    <circle cx="40" cy="45" r="28" fill="#FFFFFF"/>
+
+    <!-- Long Ears -->
+    <path d="M 28,20 Q 15,-30 25,-40 Q 38,-30 35,18 Z" fill="#FFFFFF"/>
+    <path d="M 28,16 Q 20,-25 26,-32 Q 33,-25 33,16 Z" fill="#FFCDD2"/>
+
+    <path d="M 52,20 Q 65,-30 55,-40 Q 42,-30 45,18 Z" fill="#FFFFFF"/>
+    <path d="M 52,16 Q 60,-25 54,-32 Q 47,-25 47,16 Z" fill="#FFCDD2"/>
+
+    <!-- Face (Singing with open mouth) -->
+    <circle cx="28" cy="40" r="3.5" fill="#212121"/>
+    <circle cx="52" cy="40" r="3.5" fill="#212121"/>
+    <!-- Open Singing Mouth 🎵 -->
+    <ellipse cx="40" cy="52" rx="7" ry="9" fill="#E91E63"/>
+
+    <!-- Holding Stand Microphone -->
+    <line x1="15" y1="130" x2="15" y2="55" stroke="#78909C" stroke-width="4"/>
+    <ellipse cx="15" cy="130" rx="20" ry="6" fill="#455A64"/>
+    <!-- Mic Head -->
+    <circle cx="15" cy="52" r="8" fill="#CFD8DC" stroke="#37474F" stroke-width="2"/>
+  </g>
+
+  <!-- Stage Lights & Sparkles -->
+  <g fill="#FFEB3B" opacity="0.8">
+    <polygon points="120,380 125,390 120,400 115,390"/>
+    <polygon points="400,340 406,352 400,364 394,352"/>
+    <polygon points="680,370 685,380 680,390 675,380"/>
+  </g>
+</svg>
