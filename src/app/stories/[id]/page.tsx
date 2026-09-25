@@ -1,8 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { getIllustrationSrc } from "@/lib/illustrations";
 import { StoryReader } from "@/components/StoryReader";
 
 export default async function StoryPage({
@@ -41,6 +43,8 @@ export default async function StoryPage({
     }
   }
 
+  const illustrationSrc = getIllustrationSrc(story.title);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -54,6 +58,19 @@ export default async function StoryPage({
           {story.title}
         </h1>
       </div>
+
+      {illustrationSrc && (
+        <div className="overflow-hidden rounded-2xl border border-orange-200 bg-[#FFFBF2]">
+          <Image
+            src={illustrationSrc}
+            alt={story.title}
+            width={1024}
+            height={768}
+            className="h-auto w-full"
+            priority
+          />
+        </div>
+      )}
 
       <StoryReader storyId={story.id} body={story.body} audioUrl={story.audioUrl} />
     </div>

@@ -1,8 +1,10 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { hasActiveSubscription } from "@/lib/subscription";
+import { getIllustrationSrc } from "@/lib/illustrations";
 
 export default async function LevelDetailPage({
   params,
@@ -63,13 +65,25 @@ export default async function LevelDetailPage({
       <div className="flex flex-col gap-3">
         {level.stories.map((story) => {
           const p = progressByStory.get(story.id);
+          const thumbSrc = getIllustrationSrc(story.title);
           return (
             <Link
               key={story.id}
               href={`/stories/${story.id}`}
-              className="flex items-center justify-between rounded-xl border border-orange-200 bg-white p-4 shadow-sm hover:shadow-md"
+              className="flex items-center gap-3 rounded-xl border border-orange-200 bg-white p-4 shadow-sm hover:shadow-md"
             >
-              <div>
+              <div className="h-14 w-14 flex-none overflow-hidden rounded-lg border border-orange-100 bg-[#FFFBF2]">
+                {thumbSrc && (
+                  <Image
+                    src={thumbSrc}
+                    alt=""
+                    width={112}
+                    height={112}
+                    className="h-full w-full object-cover"
+                  />
+                )}
+              </div>
+              <div className="flex-1">
                 <h2 className="font-bold">{story.title}</h2>
                 <p className="mt-1 text-xs text-gray-500">
                   {p?.listened && "🎧きいた "}
