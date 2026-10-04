@@ -4,7 +4,7 @@
 ユーザーの問い: 「関連する米国株が前日に上がったら、日本株を買えば儲かるか?」
 → jpus.universe.LEAD_LAG_PAIRS の全 67 ペアについて、取引コスト込み・先読みなしで検証する。
 
-実行: cd /home/user/my-first-app && python3 studies/s1_us_jp_leadlag.py   (所要 1 分程度)
+実行: cd /home/user/my-first-app && python3 studies/s1_us_jp_leadlag.py   (所要 20 秒程度, メモリ 0.5GB 程度)
 
 ■ 市場・証券会社・コスト (jpus.costs.TSECost)
   - 売買対象 : 東京証券取引所 (TSE) の現物株・ETF. 証券会社は SBI証券 (オンライン) を想定.
@@ -34,7 +34,8 @@
       順張り買い : z > θ なら買い          順張り売買 : |z| > θ なら sign(z) 方向
       逆張り買い : z < -θ なら買い         逆張り売買 : |z| > θ なら -sign(z) 方向
     4 族 × 4 θ × 2 保有期間 = 32 通り (全て表示).
-  - ポートフォリオ: その日シグナルが出た (ペア, 日) に資金を等分 (稼働ペアの単純平均).
+  - ポートフォリオ: 資金をその日データのあるペア数 N で常に等分 (1 ペア枠 = 1/N). シグナルの無い枠は現金.
+    (稼働ペアだけで等分すると「日」を等ウェイトにしてしまい、bp/取引 と Sharpe の符号が食い違うため不採用.)
     同一銘柄を複数ペアが同時に売買しても相殺しない (コスト面で保守的).
 
 ■ 期間・パラメータ選択
@@ -80,12 +81,15 @@ from scipy import stats  # noqa: E402
 
 import japanize_matplotlib  # noqa: E402,F401  日本語フォント (jpus.plot でも読み込む)
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
+from matplotlib.patches import Patch  # noqa: E402
 
 from jpus.align import assert_no_lookahead, jp_returns, last_us_index_before, us_signal_for_jp  # noqa: E402
 from jpus.costs import TSECost, calendar_hold_days  # noqa: E402
 from jpus.data import load_daily  # noqa: E402
-from jpus.metrics import JP_DAYS, deflated_sharpe_ratio, max_drawdown, newey_west_tstat  # noqa: E402
-from jpus.plot import plot_bar, plot_pnl  # noqa: E402
+from jpus.metrics import (JP_DAYS, block_bootstrap_pvalue, deflated_sharpe_ratio, max_drawdown,  # noqa: E402
+                          newey_west_tstat)
+from jpus.plot import plot_pnl  # noqa: E402
 from jpus.universe import JP_NAMES, LEAD_LAG_PAIRS  # noqa: E402
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -124,6 +128,32 @@ def fmt(df: pd.DataFrame, nd: int = 2) -> str:
 
 def pair_label(us_t: str, jp_t: str) -> str:
     return f"{us_t}→{jp_t} {JP_NAMES.get(jp_t, '')}"
+
+
+SEMI_LEADERS = {"^SOX", "NVDA", "AMAT", "LRCX", "KLAC", "ASML", "MU", "TSM", "AVGO", "ARM"}
+
+
+def sector_of(us_t: str, jp_t: str) -> str:
+    """LEAD_LAG_PAIRS のコメント区分に沿ったグループ (記述統計用. 売買ルールの選択には使わない)."""
+    if jp_t in {"1321.T", "1306.T", "2516.T"}:
+        return "指数→日本ETF"
+    if jp_t == "7203.T":
+        return "自動車"
+    if us_t == "NVDA" and jp_t in {"5801.T", "5802.T", "5803.T"}:
+        return "AI電力(電線)"
+    if us_t in SEMI_LEADERS:
+        return "半導体"
+    if us_t == "AAPL":
+        return "電子部品"
+    if us_t in {"KBE", "XLF", "^TNX"}:
+        return "金融"
+    if us_t in {"CL=F", "XLE", "XOP", "HG=F", "FCX", "GC=F", "COPX", "XLB"}:
+        return "資源・商社"
+    if us_t in {"CAT", "DE", "XLI", "GE"}:
+        return "機械"
+    if us_t in {"LLY", "XLV"}:
+        return "医薬"
+    return "その他"
 
 
 # ============================================================ データ
@@ -236,12 +266,14 @@ def run(S: np.ndarray, R: np.ndarray, mode: str, HD: np.ndarray | None = None, c
         gross = gross + H * np.where(valid, Rh, 0.0)
         ch, _ = leg_cost(H, mode, HDh, cost)
         c = c + ch
-    active = (S != 0) | (c != 0)
-    n_act = active.sum(axis=1)
-    net = (gross - c).sum(axis=1) / np.maximum(n_act, 1)
-    gp = gross.sum(axis=1) / np.maximum(n_act, 1)
+    # 資金は「その日データのあるペア数 N」で常に等分 (1 ペア枠 = 資金 1/N). シグナルの無い枠は現金 (損益 0).
+    # → ポートフォリオ損益の合計は (ペア, 日) 取引の損益合計に比例し、bp/取引 と Sharpe の符号が一致する.
+    n_av = valid.sum(axis=1)
+    net = (gross - c).sum(axis=1) / np.maximum(n_av, 1)
+    gp = gross.sum(axis=1) / np.maximum(n_av, 1)
+    expo = np.abs(S).sum(axis=1) / np.maximum(n_av, 1)
     return {"S": S, "R": np.where(valid, R, np.nan), "gross": gross, "cost": c, "turn": turn,
-            "net": pd.Series(net, index=CAL), "gross_p": pd.Series(gp, index=CAL), "n_act": n_act}
+            "net": pd.Series(net, index=CAL), "gross_p": pd.Series(gp, index=CAL), "expo": expo}
 
 
 def block_stats(res: dict, mask: np.ndarray) -> dict:
@@ -259,7 +291,9 @@ def block_stats(res: dict, mask: np.ndarray) -> dict:
         "粗bp/取引": 1e4 * gs / n_tr if n_tr else np.nan,
         "純bp/取引": 1e4 * (gs - cs) / n_tr if n_tr else np.nan,
         "ドリフト控除bp": 1e4 * drift_adj / n_tr if n_tr else np.nan,
-        "分岐bp(往復)": 1e4 * gs / rt if rt > 0 else np.nan,
+        # 買い持ち (売買がほぼ無い) では往復数が 0 に近く分岐コストは定義しない
+        "分岐bp(往復)": 1e4 * gs / rt if rt > 0.05 * max(n_tr, 1) else np.nan,
+        "平均建玉%": 100 * float(res["expo"][mask].mean()),
         "年率%": 100 * net.mean() * JP_DAYS,
         "Sharpe": net.mean() / sd * math.sqrt(JP_DAYS) if sd > 0 else np.nan,
         "t(NW)": newey_west_tstat(net),
@@ -378,7 +412,7 @@ if z_fail:
 hr("2. データ品質: 2008-2009 の Yahoo 東証日足の合成足 (始値=前日終値, 高値=始値, 安値=終値)")
 qrows = []
 for pid, us_t, jp_t in PAIRS:
-    jp = get_daily(jp_t)
+    jp = load_daily(jp_t, adjust=False)   # 調整係数の浮動小数誤差で等号判定が崩れないよう未調整価格で判定
     o, h, l, c = jp["Open"], jp["High"], jp["Low"], jp["Close"]
     syn = (o == c.shift(1)) & (h == np.maximum(o, c)) & (l == np.minimum(o, c))
     d = FULL[pid]
@@ -424,8 +458,31 @@ print(f"  |t寄引| ≥ 2 のペア数: IS {int((DIAG['ISt寄引'].abs() >= 2).s
       f"負 {int((DIAG['ISt寄引'] <= -2).sum())}) / OOS {int((DIAG['OOSt寄引'].abs() >= 2).sum())} "
       f"(正 {int((DIAG['OOSt寄引'] >= 2).sum())}, 負 {int((DIAG['OOSt寄引'] <= -2).sum())})  ※ 67 ペアで偶然 3 程度は出る")
 
+# セクター別の要約 (記述統計. 33 ペア・IS/OOS とも同じ符号かを見る)
+DIAG["セクター"] = [sector_of(u, j) for _, u, j in PAIRS]
+_sv = positions(A["z"], "順張り売買", 0.0)
+_bp = {}
+for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
+    g = np.where(np.isnan(A["intra"][m]), 0.0, _sv[m] * A["intra"][m])
+    n = ((_sv[m] != 0) & ~np.isnan(A["intra"][m])).sum(0)
+    _bp[per] = pd.Series(1e4 * g.sum(0) / np.maximum(n, 1), index=PIDS)
+DIAG["IS順張り売買粗bp"] = _bp["IS"].where(DIAG["IS日数"] > 0)
+DIAG["OOS順張り売買粗bp"] = _bp["OOS"]
+SEC = DIAG.groupby("セクター", sort=False).agg(
+    ペア数=("ペア", "size"), ISρギャップ=("ISρ(z,ギャップ)", "median"), ISρ寄引=("ISρ(z,寄引)", "median"),
+    OOSρギャップ=("OOSρ(z,ギャップ)", "median"), OOSρ寄引=("OOSρ(z,寄引)", "median"),
+    IS順張り粗bp=("IS順張り売買粗bp", "mean"), OOS順張り粗bp=("OOS順張り売買粗bp", "mean"))
+print("\n[セクター別] ρ は中央値. 順張り粗bp = 『順張り売買 θ=0 寄→引』のコスト前 bp/取引 (ペア平均, 往復コスト 10bp 超が必要)")
+print(fmt(SEC, 3))
+_pos = SEC.index[(SEC["ISρ寄引"] > 0.02) & (SEC["OOSρ寄引"] > 0.02)].tolist()
+_neg = SEC.index[(SEC["OOSρ寄引"] < -0.02)].tolist()
+_negis = SEC.index[(SEC["ISρ寄引"] < -0.02) & (SEC["OOSρ寄引"] < -0.02)].tolist()
+print(f"  → IS・OOS とも寄→引に同方向の続き (ρ>0.02) が残るセクター: {_pos}  (寄付での織り込みが不完全)\n"
+      f"    OOS で寄付の行き過ぎが日中に戻る (ρ<-0.02) セクター: {_neg}  (うち IS でも負: {_negis}. 他は IS ではほぼ 0 で、IS からは選べない)\n"
+      f"    いずれも粗利は往復コスト 10bp と同程度以下.")
+
 # ------------------------------------------------------------ 4. 32 通りの共通ルール
-hr("4. 全ペア共通ルール 32 通り (片道 5bp, 稼働ペア等分ポートフォリオ). IS の純 Sharpe 最大を凍結 → OOS")
+hr("4. 全ペア共通ルール 32 通り (片道 5bp, 全ペア枠に資金等分). IS の純 Sharpe 最大を凍結 → OOS")
 VAR = {}
 rows = []
 for fam in FAMILIES:
@@ -442,8 +499,8 @@ for fam in FAMILIES:
                                  else np.nan for j in range(NP)]) for per, m in [("IS", IS_M), ("ALL", ALL_M)]}
             VAR[name] = {"fam": fam, "th": th, "mk": mk, "net": res["net"], "IS": si, "OOS": so, "pS": ps, "pT": pt,
                          "sr_is_d": si["Sharpe"] / math.sqrt(JP_DAYS), "sr_oos_d": so["Sharpe"] / math.sqrt(JP_DAYS)}
-            rows.append({"ルール": name, **{f"IS {k}": si[k] for k in ["取引数", "粗bp/取引", "純bp/取引", "Sharpe", "t(NW)"]},
-                         **{f"OOS {k}": so[k] for k in ["取引数", "粗bp/取引", "純bp/取引", "Sharpe", "t(NW)"]}})
+            ks = ["取引数", "粗bp/取引", "純bp/取引", "ドリフト控除bp", "Sharpe", "t(NW)"]
+            rows.append({"ルール": name, **{f"IS {k}": si[k] for k in ks}, **{f"OOS {k}": so[k] for k in ks}})
 GRID = pd.DataFrame(rows).set_index("ルール")
 BEST = GRID["IS Sharpe"].idxmax()
 BEST_TR = GRID.loc[[n for n in GRID.index if n.startswith("順張り")], "IS Sharpe"].idxmax()
@@ -460,139 +517,18 @@ print(f"\n  ★ IS で選ばれた共通ルール (凍結): {BEST}   IS Sharpe {
 print(f"  ◎ ユーザーの問いそのもの「米国が上がったら寄付で買い→引けで売り」 = {USERQ}")
 print(f"  IS で純 Sharpe > 0 のルール数: {(GRID['IS Sharpe'] > 0).sum()} / 32,  OOS で > 0: {(GRID['OOS Sharpe'] > 0).sum()} / 32")
 print(f"  IS と OOS の純 Sharpe の順位相関 (32 通り): {stats.spearmanr(GRID['IS Sharpe'], GRID['OOS Sharpe'])[0]:+.2f}")
+print(f"  IS で NW t ≥ 2 (5% 有意相当) の共通ルール数: {(GRID['IS t(NW)'] >= 2).sum()} / 32"
+      "  → 0 なら本来は『IS の時点で採用見送り』. 以下は凍結ルールの OOS を参考として表示.")
 if GRID.loc[BEST, "IS Sharpe"] <= 0:
     print("  ※ IS 最良でも純 Sharpe ≤ 0. 実務上は『IS の時点で採用しない』が正しい判断 (以下は参考として凍結ルールの OOS を表示).")
 
-# ------------------------------------------------------------ 5. 凍結ルールとベンチマーク
-hr("5. 凍結ルール vs ベンチマーク (無条件買い / 市場ヘッジ / ランダム日プラセボ)")
+# ------------------------------------------------------------ 4b. ペア別選択 (後の比較表に使うので先に計算)
+names = list(VAR)
 
 
 def strat(name: str, hedged: bool = False, cost: TSECost = COST) -> dict:
     v = VAR[name]
     return run_mode(positions(A["z"], v["fam"], v["th"]), v["mk"], cost, hedged)
-
-
-ONES_I = np.where(~np.isnan(A["intra"]), 1.0, 0.0)
-ONES_O = np.where(~np.isnan(A["o2o"]), 1.0, 0.0)
-RES = {
-    f"凍結: {BEST}": strat(BEST),
-    f"凍結(1321.Tヘッジ): {BEST}": strat(BEST, hedged=True),
-    f"順張り最良(IS選択): {BEST_TR}": strat(BEST_TR),
-    f"逆張り最良(IS選択): {BEST_CT}": strat(BEST_CT),
-    f"問い: {USERQ}": strat(USERQ),
-    f"問い(1321.Tヘッジ): {USERQ}": strat(USERQ, hedged=True),
-    "無条件 毎日 寄→引 買い": run_mode(ONES_I, "寄→引"),
-    "無条件 毎日 寄→引 買い(1321.Tヘッジ)": run_mode(ONES_I, "寄→引", hedged=True),
-    "無条件 寄→翌寄 買い持ち": run_mode(ONES_O, "寄→翌寄"),
-}
-brow = []
-for k, res in RES.items():
-    for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
-        brow.append({"戦略": k, "区間": per, **block_stats(res, m)})
-BENCH = pd.DataFrame(brow).set_index(["戦略", "区間"])
-print(fmt(BENCH, 2))
-print("  ※ bp は (ペア, 日) 1 取引あたり. 年率%/Sharpe/t は『その日稼働したペアに資金を等分』した日次損益から."
-      "\n    ドリフト控除bp = 各ペアの期間平均リターンを差し引いた (シグナルの向きだけの) 粗利.")
-
-
-def placebo(name_res: dict, name: str, mk: str, n_rep: int = N_PLACEBO) -> dict:
-    """シグナル行列を全ペア同時に時間方向へ循環シフト (同じ取引数・同じ相関構造, 日付だけランダム)."""
-    S_full = name_res["S"]
-    a = MODE_ARGS[mk]
-    out = {}
-    for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
-        idx = np.where(m)[0]
-        Sp, Rp = S_full[idx], a["R"][idx]
-        HDp = None if a["HD"] is None else a["HD"][idx]
-        actual = float(name_res["net"].to_numpy()[idx].mean())
-        rr = np.random.default_rng(SEED + (0 if per == "IS" else 1))
-        sims, ntr = [], []
-        for _ in range(n_rep):
-            k = int(rr.integers(20, len(idx) - 20))
-            Ss = np.roll(Sp, k, axis=0)
-            valid = ~np.isnan(Rp)
-            Ss = np.where(valid, Ss, 0.0)
-            gross = Ss * np.where(valid, Rp, 0.0)
-            c, _ = leg_cost(Ss, a["mode"], HDp, COST)
-            act = (Ss != 0) | (c != 0)
-            sims.append(((gross - c).sum(1) / np.maximum(act.sum(1), 1)).mean())
-            ntr.append((Ss != 0).sum())
-        sims = np.array(sims)
-        out[per] = {"実際 bp/日": 1e4 * actual, "プラセボ平均 bp/日": 1e4 * sims.mean(),
-                    "プラセボ95%点": 1e4 * np.quantile(sims, 0.95), "p値(片側)": (np.sum(sims >= actual) + 1) / (n_rep + 1),
-                    "実際取引数": int((Sp != 0).sum()), "プラセボ平均取引数": float(np.mean(ntr))}
-    return out
-
-
-PL = {}
-for nm, key in [(BEST, f"凍結: {BEST}"), (USERQ, f"問い: {USERQ}"), (BEST_CT, f"逆張り最良(IS選択): {BEST_CT}")]:
-    if nm in PL:
-        continue
-    pr = placebo(RES[key], nm, VAR[nm]["mk"])
-    for per in ["IS", "OOS"]:
-        PL[(nm, per)] = pr[per]
-PLT = pd.DataFrame(PL).T
-PLT.index.names = ["ルール", "区間"]
-print("\n[ランダム日プラセボ] (ポートフォリオ純損益 bp/日, 片道 5bp, 循環シフト 300 回)")
-print(fmt(PLT, 3))
-
-# ------------------------------------------------------------ 6. コスト感度
-hr("6. コスト感度 (片道 0/2/5/10bp. 空売りの貸株料 1.15% は常に計上) と損益分岐")
-crow = []
-for nm in dict.fromkeys([BEST, BEST_TR, BEST_CT, USERQ]):
-    for b in SLIPS:
-        res = strat(nm, cost=COST.with_slippage(b))
-        for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
-            s = block_stats(res, m)
-            crow.append({"ルール": nm, "片道bp": b, "区間": per, "純bp/取引": s["純bp/取引"], "年率%": s["年率%"],
-                         "Sharpe": s["Sharpe"], "t(NW)": s["t(NW)"], "分岐bp(往復)": s["分岐bp(往復)"]})
-COSTT = pd.DataFrame(crow).pivot_table(index=["ルール", "片道bp"], columns="区間",
-                                       values=["純bp/取引", "年率%", "Sharpe", "分岐bp(往復)"], sort=False)
-print(fmt(COSTT, 2))
-print("  分岐bp(往復) = 平均粗利 bp/往復. 片道コスト×2 がこれを下回らないと利益が出ない (寄→引 は毎日往復).")
-
-# ------------------------------------------------------------ 7. 年別
-hr("7. 年別成績 (片道 5bp, ポートフォリオ純損益)")
-yr_keys = [f"凍結: {BEST}", f"問い: {USERQ}", f"逆張り最良(IS選択): {BEST_CT}", "無条件 毎日 寄→引 買い"]
-years = CAL.year
-yrow = []
-for y in sorted(set(years)):
-    m = np.asarray(years == y)
-    row = {"年": y, "区間": "IS" if y < OOS_START.year else "OOS"}
-    for k in yr_keys:
-        s = block_stats(RES[k], m)
-        short = k.split(":")[0]
-        row[f"{short} 純bp/取引"] = s["純bp/取引"]
-        row[f"{short} 年率%"] = s["年率%"]
-    yrow.append(row)
-YR = pd.DataFrame(yrow).set_index("年")
-print(fmt(YR, 1))
-print(f"  凍結 = {BEST} / 問い = {USERQ} / 逆張り最良 = {BEST_CT}")
-
-# ------------------------------------------------------------ 8. 凍結ルールのペア別 OOS
-hr(f"8. 凍結ルール [{BEST}] のペア別成績 (1 単位, 片道 5bp)")
-rb = RES[f"凍結: {BEST}"]
-prow = []
-for j, (pid, us_t, jp_t) in enumerate(PAIRS):
-    r = {"ペア": pair_label(us_t, jp_t)}
-    for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
-        S, g, c = rb["S"][m, j], rb["gross"][m, j], rb["cost"][m, j]
-        n = int((S != 0).sum())
-        x = pair_daily_net(rb, j, m)
-        r[f"{per}取引数"] = n
-        r[f"{per}粗bp"] = 1e4 * g.sum() / n if n else np.nan
-        r[f"{per}純bp"] = 1e4 * (g.sum() - c.sum()) / n if n else np.nan
-        r[f"{per}t"] = newey_west_tstat(x) if len(x) > 60 else np.nan
-    prow.append(r)
-PP = pd.DataFrame(prow, index=PIDS)
-print(fmt(PP.set_index("ペア"), 2))
-bb = PP.dropna(subset=["IS純bp", "OOS純bp"])
-print(f"\n  OOS 純bp > 0 のペア: {(PP['OOS純bp'] > 0).sum()} / {PP['OOS純bp'].notna().sum()}"
-      f"   IS と OOS で純bp の符号が一致: {100 * (np.sign(bb['IS純bp']) == np.sign(bb['OOS純bp'])).mean():.0f}%")
-
-# ------------------------------------------------------------ 9. ペア別に IS 最良ルールを選ぶ (過剰適合の確認)
-hr(f"9. 参考: ペア別に IS 最良ルールを選択 (32 通り × {NP} ペア = {32 * NP} 通り), IS の NW t ≥ {T_ADOPT:g} のペアだけ採用")
-names = list(VAR)
 
 
 def select_per_pair(period: str) -> list[tuple[int, str, float, float]]:
@@ -607,8 +543,8 @@ def select_per_pair(period: str) -> list[tuple[int, str, float, float]]:
     return out
 
 
-def per_pair_portfolio(sel: list[tuple[int, str, float, float]]) -> dict:
-    """採用ペアをそれぞれのルールで 1 単位売買し、稼働ペアで等分."""
+def per_pair_portfolio(sel: list[tuple[int, str, float, float]], cost: TSECost = COST, hedged: bool = False) -> dict:
+    """採用ペアをそれぞれのルールで 1 単位売買し、資金は採用ペア枠 (その日データのある数) に等分."""
     G = np.zeros((len(CAL), NP))
     C = np.zeros_like(G)
     Sall = np.zeros_like(G)
@@ -618,17 +554,173 @@ def per_pair_portfolio(sel: list[tuple[int, str, float, float]]) -> dict:
     for j, n, _, _ in sel:
         by_rule.setdefault(n, []).append(j)
     for n, js in by_rule.items():
-        res = strat(n)
+        res = strat(n, hedged, cost)
         G[:, js], C[:, js], Sall[:, js], Rall[:, js], TV[:, js] = (res["gross"][:, js], res["cost"][:, js],
                                                                   res["S"][:, js], res["R"][:, js], res["turn"][:, js])
-    act = (Sall != 0) | (C != 0)
-    net = (G - C).sum(1) / np.maximum(act.sum(1), 1)
-    return {"S": Sall, "R": Rall, "gross": G, "cost": C, "turn": TV, "net": pd.Series(net, index=CAL)}
+    n_av = (~np.isnan(Rall)).sum(1)
+    net = (G - C).sum(1) / np.maximum(n_av, 1)
+    return {"S": Sall, "R": Rall, "gross": G, "cost": C, "turn": TV, "net": pd.Series(net, index=CAL),
+            "expo": np.abs(Sall).sum(1) / np.maximum(n_av, 1),
+            "groups": [(js, VAR[n]["mk"]) for n, js in by_rule.items()]}
 
 
 sel_is = select_per_pair("IS")
 adopt_is = [s for s in sel_is if np.isfinite(s[3]) and s[3] >= T_ADOPT]
 PPS = per_pair_portfolio(adopt_is)
+PPN = f"ペア別IS選択({len(adopt_is)}ペア)"
+
+# ------------------------------------------------------------ 5. 凍結ルールとベンチマーク
+hr("5. 凍結ルール vs ベンチマーク (無条件買い / 市場ヘッジ / ランダム日プラセボ)")
+ONES_I = np.where(~np.isnan(A["intra"]), 1.0, 0.0)
+ONES_O = np.where(~np.isnan(A["o2o"]), 1.0, 0.0)
+RES = {
+    f"凍結: {BEST}": strat(BEST),
+    f"凍結(1321.Tヘッジ): {BEST}": strat(BEST, hedged=True),
+    f"順張り最良(IS選択): {BEST_TR}": strat(BEST_TR),
+    f"逆張り最良(IS選択): {BEST_CT}": strat(BEST_CT),
+    f"問い: {USERQ}": strat(USERQ),
+    f"問い(1321.Tヘッジ): {USERQ}": strat(USERQ, hedged=True),
+    PPN: PPS,
+    f"{PPN}(1321.Tヘッジ)": per_pair_portfolio(adopt_is, hedged=True),
+    "無条件 毎日 寄→引 買い": run_mode(ONES_I, "寄→引"),
+    "無条件 毎日 寄→引 買い(1321.Tヘッジ)": run_mode(ONES_I, "寄→引", hedged=True),
+    "無条件 寄→翌寄 買い持ち": run_mode(ONES_O, "寄→翌寄"),
+}
+if BEST_TR == BEST:
+    RES.pop(f"順張り最良(IS選択): {BEST_TR}")
+if BEST_CT == BEST:
+    RES.pop(f"逆張り最良(IS選択): {BEST_CT}")
+brow = []
+for k, res in RES.items():
+    for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
+        brow.append({"戦略": k, "区間": per, **block_stats(res, m)})
+BENCH = pd.DataFrame(brow).set_index(["戦略", "区間"])
+print(fmt(BENCH, 2))
+print("  ※ bp は (ペア, 日) 1 取引あたり. 年率%/Sharpe/t/最大DD は『資金を全ペア枠に常に等分』した日次損益から"
+      "\n    (平均建玉% = 資金のうち実際に建てている割合. 建玉の少ないルールは年率% が小さく出る)."
+      "\n    ドリフト控除bp = 各ペアのその期間の平均リターンを差し引いた粗利 (= 上げ相場の恩恵を除いたシグナルの価値)."
+      "\n    ヘッジ版はヘッジ側 (1321.T) の往復コストも払うので純損益は悪化する (粗bp が市場要因を除いた値).")
+if BEST_TR == BEST:
+    print(f"  (順張り最良 = 凍結ルール {BEST})")
+if BEST_CT == BEST:
+    print(f"  (逆張り最良 = 凍結ルール {BEST})")
+
+
+def placebo(res: dict, groups: list[tuple[list[int], str]], n_rep: int = N_PLACEBO) -> dict:
+    """シグナル行列を全ペア同時に同じ日数だけ時間方向へ循環シフト (取引数・ペア間の相関構造は保ち、日付だけランダム)."""
+    out = {}
+    for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
+        idx = np.where(m)[0]
+        actual = float(res["net"].to_numpy()[idx].mean())
+        G = []
+        for cols, mk in groups:
+            a = MODE_ARGS[mk]
+            Rp = a["R"][idx][:, cols]
+            G.append((res["S"][idx][:, cols], Rp, ~np.isnan(Rp), np.where(np.isnan(Rp), 0.0, Rp),
+                      None if a["HD"] is None else a["HD"][idx][:, cols], a["mode"]))
+        n_av = sum(g[2].sum(1) for g in G)
+        n_act = int(sum((g[0] != 0).sum() for g in G))
+        rr = np.random.default_rng(SEED + (0 if per == "IS" else 1))
+        sims, ntr = [], []
+        for _ in range(n_rep):
+            k = int(rr.integers(20, len(idx) - 20))
+            tot, nt = 0.0, 0
+            for Sp, Rp, valid, R0, HDp, mode in G:
+                Ss = np.where(valid, np.roll(Sp, k, axis=0), 0.0)
+                c, _ = leg_cost(Ss, mode, HDp, COST)
+                tot = tot + (Ss * R0 - c).sum(1)
+                nt += int((Ss != 0).sum())
+            sims.append((tot / np.maximum(n_av, 1)).mean())
+            ntr.append(nt)
+        sims = np.array(sims)
+        out[per] = {"実際 bp/日": 1e4 * actual, "プラセボ平均 bp/日": 1e4 * sims.mean(),
+                    "プラセボ95%点": 1e4 * np.quantile(sims, 0.95), "p値(片側)": (np.sum(sims >= actual) + 1) / (n_rep + 1),
+                    "実際取引数": n_act, "プラセボ平均取引数": float(np.mean(ntr))}
+    return out
+
+
+ALLCOLS = list(range(NP))
+PL = {}
+_pl_list = [(BEST, RES[f"凍結: {BEST}"], [(ALLCOLS, VAR[BEST]["mk"])])]
+if USERQ != BEST:
+    _pl_list.append((USERQ, RES[f"問い: {USERQ}"], [(ALLCOLS, VAR[USERQ]["mk"])]))
+if BEST_CT != BEST:
+    _pl_list.append((BEST_CT, RES[f"逆張り最良(IS選択): {BEST_CT}"], [(ALLCOLS, VAR[BEST_CT]["mk"])]))
+if adopt_is:
+    _pl_list.append((PPN, PPS, PPS["groups"]))
+for nm, res, groups in _pl_list:
+    pr = placebo(res, groups)
+    for per in ["IS", "OOS"]:
+        PL[(nm, per)] = pr[per]
+PLT = pd.DataFrame(PL).T
+PLT.index.names = ["ルール", "区間"]
+print(f"\n[ランダム日プラセボ] (ポートフォリオ純損益 bp/日, 片道 5bp, 全ペア同時の循環シフト {N_PLACEBO} 回)")
+print(fmt(PLT, 3))
+print("  p値 = プラセボ (同じ取引数をランダムな日に) が実際以上になる割合. 買いのみのルールはドリフト分もプラセボに含まれる.")
+
+# ------------------------------------------------------------ 6. コスト感度
+hr("6. コスト感度 (片道 0/2/5/10bp. 空売りの貸株料 1.15% は常に計上) と損益分岐")
+crow = []
+for nm in dict.fromkeys([BEST, BEST_TR, BEST_CT, USERQ, PPN]):
+    for b in SLIPS:
+        cst = COST.with_slippage(b)
+        res = per_pair_portfolio(adopt_is, cost=cst) if nm == PPN else strat(nm, cost=cst)
+        for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
+            s = block_stats(res, m)
+            crow.append({"ルール": nm, "片道bp": b, "区間": per, "純bp/取引": s["純bp/取引"], "年率%": s["年率%"],
+                         "Sharpe": s["Sharpe"], "t(NW)": s["t(NW)"], "分岐bp(往復)": s["分岐bp(往復)"]})
+COSTT = pd.DataFrame(crow).pivot_table(index=["ルール", "片道bp"], columns="区間",
+                                       values=["純bp/取引", "年率%", "Sharpe", "分岐bp(往復)"], sort=False)
+print(fmt(COSTT, 2))
+print("  分岐bp(往復) = 平均粗利 bp/往復 (= ちょうど損益ゼロになる往復コスト). 寄→引 は毎日往復なので粗bp/取引と同じ."
+      "\n  寄→翌寄 は同方向の連続保有で売買しないため往復数 < 取引日数 となり、分岐bp は粗bp/取引より大きい.")
+
+# ------------------------------------------------------------ 7. 年別
+hr("7. 年別成績 (片道 5bp, 純 bp/取引 と 資金全体の年率%)")
+yr_keys = [(f"凍結: {BEST}", "凍結"), (f"問い: {USERQ}", "問い"), (f"逆張り最良(IS選択): {BEST_CT}", "逆張り最良"),
+           (PPN, "ペア別選択"), ("無条件 毎日 寄→引 買い", "無条件寄引"), ("無条件 寄→翌寄 買い持ち", "買い持ち")]
+yr_keys = [(k, sh) for k, sh in yr_keys if k in RES]
+years = CAL.year
+yrow = []
+for y in sorted(set(years)):
+    m = np.asarray(years == y)
+    row = {"年": y, "区間": "IS" if y < OOS_START.year else "OOS"}
+    for k, short in yr_keys:
+        s = block_stats(RES[k], m)
+        row[f"{short} bp"] = s["純bp/取引"]
+        row[f"{short} 年率%"] = s["年率%"]
+    yrow.append(row)
+YR = pd.DataFrame(yrow).set_index("年")
+print(fmt(YR, 1))
+print(f"  凍結 = {BEST} / 問い = {USERQ} / 逆張り最良 = {BEST_CT} / ペア別選択 = 9 節")
+
+# ------------------------------------------------------------ 8. 凍結ルールのペア別 OOS
+hr(f"8. 凍結ルール [{BEST}] のペア別成績 (1 単位, 片道 5bp)")
+rb = RES[f"凍結: {BEST}"]
+prow = []
+for j, (pid, us_t, jp_t) in enumerate(PAIRS):
+    r = {"ペア": pair_label(us_t, jp_t)}
+    for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
+        S, g, c = rb["S"][m, j], rb["gross"][m, j], rb["cost"][m, j]
+        n = int((S != 0).sum())
+        x = pair_daily_net(rb, j, m)
+        r[f"{per}取引数"] = n
+        r[f"{per}粗bp"] = 1e4 * g.sum() / n if n else np.nan
+        r[f"{per}純bp"] = 1e4 * (g.sum() - c.sum()) / n if n else np.nan
+        Rj = rb["R"][m, j]
+        r[f"{per}ドリフト控除bp"] = (1e4 * float(np.nansum(np.where(S != 0, S * (Rj - np.nanmean(Rj)), 0.0))) / n
+                                   if n else np.nan)
+        r[f"{per}t"] = newey_west_tstat(x) if len(x) > 60 else np.nan
+    prow.append(r)
+PP = pd.DataFrame(prow, index=PIDS)
+print(fmt(PP.set_index("ペア"), 2))
+bb = PP.dropna(subset=["IS純bp", "OOS純bp"])
+print(f"\n  OOS 純bp > 0 のペア: {(PP['OOS純bp'] > 0).sum()} / {PP['OOS純bp'].notna().sum()}"
+      f"   IS と OOS で純bp の符号が一致: {100 * (np.sign(bb['IS純bp']) == np.sign(bb['OOS純bp'])).mean():.0f}%"
+      f"   OOS ドリフト控除bp > 0 のペア: {(PP['OOSドリフト控除bp'] > 0).sum()} / {PP['OOSドリフト控除bp'].notna().sum()}")
+
+# ------------------------------------------------------------ 9. ペア別に IS 最良ルールを選ぶ (過剰適合の確認)
+hr(f"9. 参考: ペア別に IS 最良ルールを選択 (32 通り × {NP} ペア = {32 * NP} 通り), IS の NW t ≥ {T_ADOPT:g} のペアだけ採用")
 srow = []
 for j, n, sr, t in adopt_is:
     us_t, jp_t = PAIRS[j][1], PAIRS[j][2]
@@ -638,8 +730,10 @@ for j, n, sr, t in adopt_is:
 SEL = pd.DataFrame(srow)
 print(fmt(SEL.set_index("ペア"), 2) if len(SEL) else "  採用ペアなし")
 fam_cnt = pd.Series([n.split(" ")[0] for _, n, _, _ in sel_is]).value_counts()
+fol_cnt = pd.Series([PAIRS[j][2] for j, _, _, _ in adopt_is]).value_counts()
 print(f"\n  各ペアの IS 最良ルールの族の内訳 (採用前, {len(sel_is)} ペア): {fam_cnt.to_dict()}")
 print(f"  採用 {len(adopt_is)} ペア (IS で計 {32 * NP} 通りを試した最大値なので IS の t は大きく割り引いて見ること)")
+print(f"  採用ペアの日本株の重複: {fol_cnt.to_dict()}  (同じ銘柄・似たシグナルが多く、独立な賭けの数はもっと少ない)")
 for per, m in [("IS", IS_M), ("OOS", OOS_M)]:
     s = block_stats(PPS, m)
     print(f"  ペア別選択ポートフォリオ {per}: 取引数 {s['取引数']}, 純bp/取引 {s['純bp/取引']:+.2f}, 年率 {s['年率%']:+.2f}%,"
@@ -696,6 +790,9 @@ s_pp = block_stats(PPS, OOS_M)
 p_pp = 1 - stats.norm.cdf(s_pp["t(NW)"]) if np.isfinite(s_pp["t(NW)"]) else np.nan
 print(f"  ペア別 IS 選択ポートフォリオ: OOS t = {s_pp['t(NW)']:+.2f}, 片側 p = {p_pp:.4f}, "
       f"Bonferroni (×{N_PORT_TESTS}) p = {min(1.0, p_pp * N_PORT_TESTS):.4f}")
+bb_fr = block_bootstrap_pvalue(x_oos, n_boot=2000, block=10, seed=SEED)
+bb_pp = block_bootstrap_pvalue(PPS["net"][OOS_M], n_boot=2000, block=10, seed=SEED)
+print(f"  ブロック・ブートストラップ (10 日ブロック) 片側 p (OOS 平均 > 0): 凍結ルール {bb_fr:.4f} / ペア別選択 {bb_pp:.4f}")
 N_TRIED = len(names) + len(names) * NP
 print(f"  試した戦略の総数: 共通ルール {len(names)} + ペア別 {len(names) * NP} = {N_TRIED} (リーク版 4・ベンチマーク 3 は別)")
 
@@ -703,28 +800,53 @@ print(f"  試した戦略の総数: 共通ルール {len(names)} + ペア別 {le
 hr("12. 結論 (要約)")
 sb_is, sb_oos = VAR[BEST]["IS"], VAR[BEST]["OOS"]
 uq_is, uq_oos = VAR[USERQ]["IS"], VAR[USERQ]["OOS"]
-ub = block_stats(RES["無条件 毎日 寄→引 買い"], OOS_M)
-print(f"  ・ユーザーの問い「前日に米国関連株が上がったら寄付で買い→引けで売る」({USERQ}):\n"
-      f"      粗 {uq_is['粗bp/取引']:+.1f}bp (IS) / {uq_oos['粗bp/取引']:+.1f}bp (OOS) / 取引, 純 {uq_is['純bp/取引']:+.1f} / "
-      f"{uq_oos['純bp/取引']:+.1f}bp, OOS Sharpe {uq_oos['Sharpe']:+.2f}  (無条件の毎日 寄→引 買い OOS: 粗 {ub['粗bp/取引']:+.1f}bp)")
-print(f"  ・米国の前日の動きは寄付ギャップでほぼ織り込み済み (ギャップ比 中央値 OOS {DIAG['OOSギャップ比%'].median():.0f}%)."
-      f" 寄→引 に残る相関の中央値は {DIAG['OOSρ(z,寄引)'].median():+.3f}")
-print(f"  ・IS で選んだ共通ルール {BEST}: IS 純 {sb_is['純bp/取引']:+.1f}bp, Sharpe {sb_is['Sharpe']:+.2f} → OOS 純 "
-      f"{sb_oos['純bp/取引']:+.1f}bp, Sharpe {sb_oos['Sharpe']:+.2f}, t {sb_oos['t(NW)']:+.2f}")
-print(f"  ・リーク版は (i) {LK.loc[(list(LEAK)[1], 'OOS'), '純bp/取引']:+.1f}bp, (ii) {LK.loc[(list(LEAK)[2], 'OOS'), '純bp/取引']:+.1f}bp"
-      f" / 取引 (OOS) と桁違いに良く見えるが実行不可能.")
+ub = BENCH.loc[("無条件 毎日 寄→引 買い", "OOS")]
+bh = BENCH.loc[("無条件 寄→翌寄 買い持ち", "OOS")]
+fh = BENCH.loc[(f"凍結(1321.Tヘッジ): {BEST}", "OOS")]
+qh = BENCH.loc[(f"問い(1321.Tヘッジ): {USERQ}", "OOS")]
+pp_is, pp_oos = BENCH.loc[(PPN, "IS")], BENCH.loc[(PPN, "OOS")]
+ct_oos = BENCH.loc[(f"逆張り最良(IS選択): {BEST_CT}", "OOS")] if BEST_CT != BEST else BENCH.loc[(f"凍結: {BEST}", "OOS")]
+pp10 = COSTT.loc[(PPN, 10.0), ("純bp/取引", "OOS")] if (PPN, 10.0) in COSTT.index else np.nan
+print(f"  1) ユーザーの問い「前日に関連米国株が上がったら 寄付で買い→引けで売る」({USERQ}):\n"
+      f"     コスト前 {uq_is['粗bp/取引']:+.1f}bp (IS) / {uq_oos['粗bp/取引']:+.1f}bp (OOS) / 取引 → 往復 10bp 払うと "
+      f"{uq_is['純bp/取引']:+.1f} / {uq_oos['純bp/取引']:+.1f}bp, OOS Sharpe {uq_oos['Sharpe']:+.2f}. 損益分岐は往復 "
+      f"{uq_oos['分岐bp(往復)']:.1f}bp (OOS) しかなく、現実の執行コスト (往復 10bp 前後) では利益にならない.\n"
+      f"     同じ日に無条件で買っても OOS 粗 {ub['粗bp/取引']:+.1f}bp → シグナルの上乗せは無い (市場ヘッジ版の粗利 {qh['粗bp/取引']:+.1f}bp).")
+print(f"  2) 理由: 米国の前日の動きは東証の寄付ギャップで (中央値で {DIAG['OOSギャップ比%'].median():.0f}%) 織り込み済み. "
+      f"ρ(z,ギャップ) 中央値 {DIAG['OOSρ(z,ギャップ)'].median():+.2f} に対し ρ(z,寄→引) は {DIAG['OOSρ(z,寄引)'].median():+.3f}.")
+print(f"  3) IS で選んで凍結した共通ルール {BEST}: OOS 純 {sb_oos['純bp/取引']:+.1f}bp/取引, Sharpe {sb_oos['Sharpe']:+.2f}, "
+      f"t {sb_oos['t(NW)']:+.2f} と一見プラスだが、\n     ドリフト控除 {sb_oos['ドリフト控除bp']:+.1f}bp, ランダム日プラセボ p = "
+      f"{PL[(BEST, 'OOS')]['p値(片側)']:.2f}, 1321.T ヘッジ後 純 {fh['純bp/取引']:+.1f}bp, 単なる買い持ち (OOS 年率 "
+      f"{bh['年率%']:.1f}%, Sharpe {bh['Sharpe']:.2f}) に劣る\n     → 利益は日本株の上昇ドリフト (生存者バイアス込み) であり、"
+      f"米国シグナルの価値ではない. 多重検定後 (DSR {dsr_is:.2f}, Bonferroni p {min(1.0, p_oos * N_PORT_TESTS):.2f}) も有意でない.")
+print(f"  4) 逆張り (寄付の行き過ぎの戻り) は OOS の半導体・指数 ETF で見えるが IS ではほぼ 0. IS 最良の逆張り {BEST_CT} は "
+      f"IS 純 {VAR[BEST_CT]['IS']['純bp/取引']:+.1f}bp → OOS 純 {ct_oos['純bp/取引']:+.1f}bp (Sharpe {ct_oos['Sharpe']:+.2f}). "
+      f"事前には選べず、採用根拠にならない.")
+print(f"  5) ペア別に IS で選んだ {len(adopt_is)} ペア (主に 銅・金・資源株 → 住友金属鉱山 などの順張り): IS 純 "
+      f"{pp_is['純bp/取引']:+.1f}bp → OOS 純 {pp_oos['純bp/取引']:+.1f}bp/取引, Sharpe {pp_oos['Sharpe']:+.2f}, t {pp_oos['t(NW)']:+.2f},"
+      f"\n     プラセボ p = {PL[(PPN, 'OOS')]['p値(片側)']:.3f}. ただし Bonferroni p = {min(1.0, p_pp * N_PORT_TESTS):.2f}, "
+      f"片道 10bp では OOS 純 {pp10:+.1f}bp, 5713.T 一銘柄に集中 → 『境界線上 (marginal)』. 小さく試すなら資源株のみ.")
+print(f"  6) リーク版 (実行不可能) は OOS 純 (i) {LK.loc[(list(LEAK)[1], 'OOS'), '純bp/取引']:+.1f}bp, "
+      f"(ii) {LK.loc[(list(LEAK)[2], 'OOS'), '純bp/取引']:+.1f}bp, (iv) {LK.loc[(list(LEAK)[3], 'OOS'), '純bp/取引']:+.1f}bp / 取引,"
+      f" (iii) 2008-09 合成足 粗 {Q['順張り売買bp08-09'].mean():+.0f}bp.\n     → 『米国が上がったら日本株を買えば儲かる』"
+      f"という印象は、ほぼすべて先読み (米国引け後の情報で日本の前日引けに建てる等) かデータ不良から来ている.")
 print(f"\n経過時間 {time.time() - T0:.0f} 秒. 以下グラフを表示 (閉じると次へ).")
 
 # ------------------------------------------------------------ 13. グラフ
-plot_pnl({
-    f"凍結共通ルール: {BEST}": RES[f"凍結: {BEST}"]["net"],
-    f"凍結ルール 1321.Tヘッジ": RES[f"凍結(1321.Tヘッジ): {BEST}"]["net"],
-    f"順張り(IS最良): {BEST_TR}": RES[f"順張り最良(IS選択): {BEST_TR}"]["net"],
-    f"逆張り(IS最良): {BEST_CT}": RES[f"逆張り最良(IS選択): {BEST_CT}"]["net"],
-    f"問い: {USERQ}": RES[f"問い: {USERQ}"]["net"],
-    "無条件 毎日 寄→引 買い": RES["無条件 毎日 寄→引 買い"]["net"],
-    f"ペア別IS選択 ({len(adopt_is)}ペア)": PPS["net"],
-}, f"S1 米国→日本リードラグ: 実行可能な戦略の累積純損益 (東証×SBI, 片道5bp, {len(PAIRS)}ペア等分)", OOS_START)
+curves = {f"凍結共通ルール: {BEST}" + (" (=順張り最良)" if BEST == BEST_TR else " (=逆張り最良)" if BEST == BEST_CT else ""):
+          RES[f"凍結: {BEST}"]["net"],
+          "凍結ルール 1321.Tヘッジ": RES[f"凍結(1321.Tヘッジ): {BEST}"]["net"]}
+if BEST_TR != BEST:
+    curves[f"順張り(IS最良): {BEST_TR}"] = RES[f"順張り最良(IS選択): {BEST_TR}"]["net"]
+if BEST_CT != BEST:
+    curves[f"逆張り(IS最良): {BEST_CT}"] = RES[f"逆張り最良(IS選択): {BEST_CT}"]["net"]
+if USERQ not in (BEST, BEST_TR, BEST_CT):
+    curves[f"問い: {USERQ}"] = RES[f"問い: {USERQ}"]["net"]
+curves["無条件 毎日 寄→引 買い"] = RES["無条件 毎日 寄→引 買い"]["net"]
+curves["無条件 寄→翌寄 買い持ち"] = RES["無条件 寄→翌寄 買い持ち"]["net"]
+curves[f"ペア別IS選択 ({len(adopt_is)}ペア, 参考)"] = PPS["net"]
+plot_pnl(curves, f"S1 米国→日本リードラグ: 実行可能な戦略の累積純損益 (東証×SBI, 片道5bp, 資金を{len(PAIRS)}ペア枠に等分)",
+         OOS_START)
 
 plot_pnl({
     f"正直版: {LEAK_FAM} θ=0 寄→引": LEAK[f"正直版: {LEAK_FAM} θ=0 寄→引 (米国 d<D)"]["net"],
@@ -734,8 +856,24 @@ plot_pnl({
     "正直版: ペア別IS選択": PPS["net"],
 }, "S1 リーク版 (実行不可能) と正直版の比較: 先読みすると成績は桁違いに水増しされる", OOS_START)
 
-oos_bp = PP.set_index(PP["ペア"].str.split(" ").str[0])["OOS純bp"].dropna().sort_values()
-plot_bar(oos_bp, f"凍結ルール [{BEST}] のペア別 OOS 純損益 (bp/取引, 片道5bp)", ylabel="bp/取引")
+pp = PP.set_index(PP["ペア"].str.split(" ").str[0])[["OOS純bp", "OOSドリフト控除bp"]].dropna().sort_values("OOS純bp")
+fig, ax = plt.subplots(figsize=(14, 5.5))
+xs = np.arange(len(pp))
+ax.bar(xs, pp["OOS純bp"], color=["tab:blue" if v >= 0 else "tab:red" for v in pp["OOS純bp"]])
+ax.plot(xs, pp["OOSドリフト控除bp"], "k.", ms=7)
+ax.legend(handles=[Patch(color="tab:blue", label="OOS 純損益 (bp/取引) プラス"),
+                   Patch(color="tab:red", label="OOS 純損益 (bp/取引) マイナス"),
+                   Line2D([], [], color="k", marker=".", ls="", ms=8,
+                          label="OOS ドリフト控除 bp (上げ相場の恩恵を除いたシグナル自体の価値, コスト前)")],
+          loc="upper left", fontsize=9)
+ax.set_xticks(xs)
+ax.set_xticklabels(pp.index, rotation=80, fontsize=7)
+ax.axhline(0, color="black", lw=0.6)
+ax.set_ylabel("bp/取引")
+ax.set_title(f"凍結ルール [{BEST}] のペア別 OOS 成績 (片道5bp): 棒=純損益, 点=上げ相場の恩恵を除いた価値")
+ax.grid(alpha=0.3, axis="y")
+plt.tight_layout()
+plt.show()
 
 fig, ax = plt.subplots(figsize=(14, 5.5))
 dd = DIAG.set_index(DIAG.index.str.replace(".T", "", regex=False))
