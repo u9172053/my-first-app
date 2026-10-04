@@ -121,3 +121,32 @@ def sign_permutation_pvalue(signal: pd.Series, ret: pd.Series, n_perm: int = 200
         k = rng.integers(1, len(s) - 1)
         cnt += np.mean(np.roll(s, k) * r) >= obs  # 円環シフトで自己相関を保つ
     return float((cnt + 1) / (n_perm + 1))
+
+
+def pvalue_from_t(t: float | np.ndarray, two_sided: bool = False) -> np.ndarray:
+    """t 値 (正規近似) から p 値. two_sided=False なら「平均 > 0」の片側."""
+    t = np.asarray(t, dtype=float)
+    p = 1 - stats.norm.cdf(t)
+    return 2 * np.minimum(p, 1 - p) if two_sided else p
+
+
+def bh_fdr(pvals: np.ndarray | pd.Series, q: float = 0.05) -> np.ndarray:
+    """Benjamini-Hochberg: 偽発見率 q で「発見」と判定できる仮説の bool 配列.
+
+    総当たり (何百通りも試す) では偶然の当たりが必ず出るので、
+    IS で BH-FDR を通過したものだけを OOS で確認する、という 2 段階で使う.
+    """
+    p = np.asarray(pvals, dtype=float)
+    n = np.sum(~np.isnan(p))
+    out = np.zeros(len(p), dtype=bool)
+    if n == 0:
+        return out
+    order = np.argsort(np.where(np.isnan(p), np.inf, p))
+    ranked = p[order]
+    thresh = q * np.arange(1, len(p) + 1) / n
+    ok = ranked <= thresh
+    if ok.any():
+        k = np.max(np.where(ok)[0])
+        out[order[: k + 1]] = True
+    out[np.isnan(p)] = False
+    return out
