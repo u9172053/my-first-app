@@ -12,12 +12,16 @@ def plot_pnl(curves: dict[str, pd.Series], title: str, oos_start: str | pd.Times
     own = ax is None
     if own:
         fig, ax = plt.subplots(figsize=(12, 6))
+    x_end = None
     for name, r in curves.items():
         r = pd.Series(r).fillna(0.0)
         ax.plot(r.index, 100 * r.cumsum(), label=name, lw=1.3)
-    if oos_start is not None:
+        if len(r):
+            x_end = r.index[-1] if x_end is None else max(x_end, r.index[-1])
+    if oos_start is not None and x_end is not None:
         ax.axvline(pd.Timestamp(oos_start), color="gray", ls="--", lw=1)
-        ax.axvspan(pd.Timestamp(oos_start), ax.get_xlim()[1], color="gray", alpha=0.08, label="アウトオブサンプル")
+        # 日付軸のまま網掛け (get_xlim() の数値と Timestamp を混ぜると軸が 1970 年まで伸びる)
+        ax.axvspan(pd.Timestamp(oos_start), x_end, color="gray", alpha=0.08, label="アウトオブサンプル")
     ax.axhline(0, color="black", lw=0.6)
     ax.set_title(title)
     ax.set_ylabel(ylabel)
