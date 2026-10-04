@@ -1,0 +1,7 @@
+pandas>=2.0
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+yfinance>=0.2.40
+japanize-matplotlib  # Python 3.12 以降でビルドに失敗する場合は: pip install japanize-matplotlib-modern
+pytest

@@ -1,0 +1,5 @@
+# 取得したチャートデータ (各自 fetch_data.py で取得)
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
