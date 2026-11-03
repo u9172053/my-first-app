@@ -1,0 +1,23 @@
+// ============================================================
+//  設定ファイル  ― ここだけ書き換えればOK
+// ============================================================
+export const CONFIG = {
+  appName: '多読きろく帳',
+  siteName: 'おうち英語の解体新書',
+  siteUrl: 'https://www.ouchieigo-club.com/kaitai-shinsho/',
+
+  // このアプリを埋め込んだ WordPress ページのURL（SNSシェアのリンク先）
+  shareUrl: 'https://www.ouchieigo-club.com/kaitai-shinsho/',
+
+  // Google Cloud で発行した OAuth クライアントID（English Quest で使ったものを流用可）
+  // 例: '1234567890-xxxxxxxx.apps.googleusercontent.com'
+  // 空欄のままだと Google ログインボタンは非表示（端末保存のみ）
+  googleClientId: '',
+
+  // Amazon アソシエイトのトラッキングID（例: 'ouchieigo-22'）
+  amazonTag: '',
+  // 楽天アフィリエイトID（例: '1a2b3c4d.5e6f7a8b.1a2b3c4d.5e6f7a8b'）
+  rakutenAffiliateId: '',
+
+  hashtags: ['おうち英語', '多読', 'おうち英語の解体新書'],
+};

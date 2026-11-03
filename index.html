@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>多読きろく帳｜おうち英語の解体新書</title>
+<meta name="description" content="子どもの英語多読・日本語読書をカレンダーで記録。人気の本は検索やバーコードでかんたん登録。データはあなたの端末とGoogleドライブだけに保存されます。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="多読きろく帳｜おうち英語の解体新書">
+<meta property="og:description" content="読んだ本の語数をカレンダーで記録。英語・日本語を分けて集計、バーコードでかんたん登録。">
+<meta property="og:image" content="og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#fff8ee">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <span class="logo">📚</span>
+      <div>
+        <h1>多読きろく帳</h1>
+        <p class="by">by おうち英語の解体新書</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="syncBtn" class="chip-btn" hidden></button>
+      <button id="settingsBtn" class="icon-btn" aria-label="設定">⚙️</button>
+    </div>
+  </header>
+
+  <nav id="childTabs" class="child-tabs" aria-label="記録する子"></nav>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="card calendar-card">
+    <div class="cal-head">
+      <button id="prevMonth" class="icon-btn" aria-label="前の月">‹</button>
+      <h2 id="monthLabel"></h2>
+      <button id="nextMonth" class="icon-btn" aria-label="次の月">›</button>
+    </div>
+    <div class="legend"><span class="dot en"></span>英語（語）<span class="dot ja"></span>日本語（冊）</div>
+    <div class="cal-grid cal-week"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div class="month-sum" id="monthSum"></div>
+  </section>
+
+  <button id="addBtn" class="fab">＋ 読んだ本を記録</button>
+
+  <section class="card">
+    <div class="sec-head">
+      <h2>🎉 SNSでシェア</h2>
+    </div>
+    <p class="muted">今月の記録を画像にしてシェアできます。</p>
+    <button id="shareOpen" class="btn primary wide">シェア画像をつくる</button>
+  </section>
+
+  <section class="card" id="recoCard">
+    <div class="sec-head">
+      <h2>📖 つぎのおすすめ</h2><span class="pr">PR</span>
+    </div>
+    <p class="muted" id="recoNote"></p>
+    <div id="recoList" class="reco-list"></div>
+  </section>
+
+  <footer class="foot">
+    <p>🔒 記録はこの端末（とログインした場合はあなたのGoogleドライブ）だけに保存されます。サイト運営者には送信されません。</p>
+    <p>※語数・文字数は目安です。表紙・書誌情報：openBD / Google Books</p>
+    <p>Amazonのアソシエイトとして、おうち英語の解体新書は適格販売により収入を得ています。本ページには楽天アフィリエイトのリンクも含まれます。</p>
+    <p><a href="https://www.ouchieigo-club.com/kaitai-shinsho/" target="_top">おうち英語の解体新書 トップへ</a></p>
+  </footer>
+</div>
+
+<!-- 本を追加 -->
+<dialog id="addDlg" class="sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="閉じる">✕</button>
+    <h3 id="addTitle">読んだ本を記録</h3>
+    <span></span>
+  </div>
+  <div id="addSearchView">
+    <div class="search-row">
+      <input id="searchInput" type="search" placeholder="タイトル・シリーズ名で検索（例：ORT, Frog）" autocomplete="off">
+      <button id="scanBtn" class="btn" title="バーコードで読み取り">📷<span class="sm-hide"> バーコード</span></button>
+    </div>
+    <div id="searchResults" class="results"></div>
+    <button id="manualBtn" class="btn ghost wide">見つからない？ 手入力で登録</button>
+  </div>
+  <form id="bookForm" class="book-form" hidden>
+    <div class="form-book">
+      <div id="formCover" class="cover lg"></div>
+      <div class="grow">
+        <label>タイトル<input id="fTitle" required></label>
+        <label>著者<input id="fAuthor"></label>
+      </div>
+    </div>
+    <div class="seg" role="radiogroup">
+      <label><input type="radio" name="fLang" value="en" checked><span>🇬🇧 英語</span></label>
+      <label><input type="radio" name="fLang" value="ja"><span>🇯🇵 日本語</span></label>
+    </div>
+    <div id="enFields">
+      <label>語数 <small class="muted" id="wordHint"></small><input id="fWords" type="number" inputmode="numeric" min="0" step="1"></label>
+    </div>
+    <div id="jaFields" hidden>
+      <label>文字数（目安・わからなければ下から選択）<input id="fChars" type="number" inputmode="numeric" min="0" step="1"></label>
+      <div id="charPresets" class="chips"></div>
+    </div>
+    <div class="row2">
+      <label>日付<input id="fDate" type="date" required></label>
+      <label>回数
+        <div class="stepper"><button type="button" id="tMinus">−</button><input id="fTimes" type="number" min="1" value="1"><button type="button" id="tPlus">＋</button></div>
+      </label>
+    </div>
+    <div id="childPick" class="chips"></div>
+    <div class="form-actions">
+      <button type="button" id="backBtn" class="btn ghost">‹ もどる</button>
+      <button type="button" id="deleteLog" class="btn danger" hidden>削除</button>
+      <button type="submit" class="btn primary grow">記録する</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- 日別 -->
+<dialog id="dayDlg" class="sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="閉じる">✕</button>
+    <h3 id="dayTitle"></h3><span></span>
+  </div>
+  <div id="daySum" class="day-sum"></div>
+  <div id="dayList" class="results"></div>
+  <button id="dayAdd" class="btn primary wide">＋ この日に記録を追加</button>
+</dialog>
+
+<!-- バーコード -->
+<dialog id="scanDlg" class="sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="閉じる">✕</button>
+    <h3>バーコードを読み取り</h3><span></span>
+  </div>
+  <div class="scan-wrap"><video id="scanVideo" playsinline muted></video><div class="scan-frame"></div></div>
+  <p class="muted center" id="scanMsg">本の裏の「978」から始まるバーコードを枠に合わせてください</p>
+</dialog>
+
+<!-- シェア -->
+<dialog id="shareDlg" class="sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="閉じる">✕</button>
+    <h3>シェア</h3><span></span>
+  </div>
+  <label class="check"><input type="checkbox" id="shareName"> 子どもの名前を画像に入れる</label>
+  <canvas id="shareCanvas" class="share-canvas"></canvas>
+  <div class="share-btns">
+    <button id="shareNative" class="btn primary">画像をシェア</button>
+    <button id="shareSave" class="btn">画像を保存</button>
+    <a id="shareX" class="btn x" target="_blank" rel="noopener">𝕏 でポスト</a>
+    <a id="shareLine" class="btn line" target="_blank" rel="noopener">LINEで送る</a>
+  </div>
+  <p class="muted small">Instagramには「画像を保存」してから投稿してください。</p>
+</dialog>
+
+<!-- 設定 -->
+<dialog id="setDlg" class="sheet">
+  <div class="sheet-head">
+    <button class="icon-btn" data-close aria-label="閉じる">✕</button>
+    <h3>設定</h3><span></span>
+  </div>
+  <h4>👧 子ども</h4>
+  <div id="childList" class="child-list"></div>
+  <button id="addChild" class="btn wide">＋ 子どもを追加</button>
+
+  <h4 id="gHead">☁️ Googleアカウントで保存</h4>
+  <div id="gArea"></div>
+
+  <h4>💾 バックアップ</h4>
+  <p class="muted small">機種変更などに備えて、記録をファイルに書き出せます。</p>
+  <div class="row2">
+    <button id="exportBtn" class="btn">書き出す</button>
+    <label class="btn file-btn">読み込む<input id="importFile" type="file" accept="application/json,.json" hidden></label>
+  </div>
+  <button id="resetBtn" class="btn danger wide mt">この端末の記録をすべて消す</button>
+</dialog>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
