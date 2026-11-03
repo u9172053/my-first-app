@@ -47,15 +47,18 @@ function mapGoogle(item) {
   };
 }
 
+const gbKey = () => (CONFIG.googleBooksApiKey ? `&key=${encodeURIComponent(CONFIG.googleBooksApiKey)}` : '');
+
+// Google Books 検索（失敗時は例外を投げる）
 export async function searchGoogleBooks(q, signal) {
-  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12&printType=books`;
+  const url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12&printType=books${gbKey()}`;
   const r = await fetch(url, { signal });
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error('googlebooks ' + r.status);
   const j = await r.json();
   return (j.items || []).map(mapGoogle).filter((b) => b.title);
 }
 
-// バーコード(ISBN)から本を探す：openBD → Google Books の順
+// バーコード(ISBN)から本を探す：openBD → Google Books → Open Library の順
 export async function lookupIsbn(isbn) {
   try {
     const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
@@ -66,35 +69,97 @@ export async function lookupIsbn(isbn) {
     }
   } catch { /* 次へ */ }
   try {
-    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
-    const j = await r.json();
-    if (j.items?.length) return { ...mapGoogle(j.items[0]), isbn };
+    const list = await searchGoogleBooks(`isbn:${isbn}`);
+    if (list.length) return { ...list[0], isbn };
+  } catch { /* 次へ */ }
+  try {
+    const r = await fetch(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1&fields=title,author_name,cover_i,language`);
+    const d = (await r.json()).docs?.[0];
+    if (d?.title) {
+      return {
+        title: d.title, author: (d.author_name || []).join(', '), isbn,
+        cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '',
+        lang: (d.language || []).includes('jpn') || isJapanese(d.title) ? 'ja' : 'en',
+      };
+    }
   } catch { /* 見つからず */ }
   return null;
 }
 
-// プリセット本の表紙を Google Books から探してキャッシュ
-const COVER_KEY = 'tadoku-cover-cache';
+// ---------------- 表紙（プリセット本） ----------------
+// 英語の本：Open Library（キー不要）→ Google Books
+// 日本語の本：Google Books → Open Library
+// 見つからなかった結果は7日間だけ覚えておき、通信エラーは覚えない
+const COVER_KEY = 'tadoku-cover-cache-v2';
+const MISS_TTL = 7 * 24 * 3600 * 1000;
 let coverCache = {};
 try { coverCache = JSON.parse(localStorage.getItem(COVER_KEY) || '{}'); } catch { coverCache = {}; }
+try { localStorage.removeItem('tadoku-cover-cache'); } catch { /* 旧キャッシュ削除 */ }
 const inflight = new Map();
+const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 
-export function cachedCover(pid) { return coverCache[pid]; }
+// 戻り値: URL文字列 / ''（表紙なし確定） / undefined（未取得）
+export function cachedCover(pid) {
+  const v = coverCache[pid];
+  if (v === undefined) return undefined;
+  if (typeof v === 'string') return v;
+  if (Date.now() - v.miss < MISS_TTL) return '';
+  return undefined;
+}
+
+function saveCovers() {
+  try { localStorage.setItem(COVER_KEY, JSON.stringify(coverCache)); } catch { /* 容量オーバーは無視 */ }
+}
+
+async function openLibraryCover(title, author) {
+  const u = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}` +
+    (author ? `&author=${encodeURIComponent(author)}` : '') + '&limit=5&fields=cover_i';
+  const r = await fetch(u);
+  if (!r.ok) throw new Error('openlibrary ' + r.status);
+  const d = (await r.json()).docs?.find((x) => x.cover_i);
+  return d ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '';
+}
+
+async function googleCover(title, author) {
+  const list = await searchGoogleBooks(`intitle:${title}` + (author ? ` inauthor:${author}` : ''));
+  return list.find((b) => b.cover)?.cover || '';
+}
+
+// 同時に問い合わせる数を制限（相手サーバーに優しく）
+let running = 0;
+const waiting = [];
+function limited(fn) {
+  return new Promise((res, rej) => {
+    const run = () => {
+      running++;
+      fn().then(res, rej).finally(() => { running--; waiting.shift()?.(); });
+    };
+    if (running < 3) run(); else waiting.push(run);
+  });
+}
 
 export function fetchPresetCover(book) {
-  if (book.pid in coverCache) return Promise.resolve(coverCache[book.pid]);
-  if (/（1冊|\(1冊/.test(book.title)) { coverCache[book.pid] = ''; return Promise.resolve(''); }
+  const c = cachedCover(book.pid);
+  if (c !== undefined) return Promise.resolve(c);
+  if (isGeneric(book.title)) { coverCache[book.pid] = { miss: Date.now() }; return Promise.resolve(''); }
   if (inflight.has(book.pid)) return inflight.get(book.pid);
-  const title = book.title.replace(/[（(].*?[)）]/g, '').trim();
+  const base = book.title.replace(/[（(].*?[)）]/g, '').trim();
+  const title = base.replace(/^.*#\d+\s*/, '').trim() || base.replace(/\s*#\d+$/, '').trim();
   const author = book.author.split(/[\/,]/)[0].trim();
-  const q = `intitle:${title}` + (author ? `+inauthor:${author}` : '');
-  const p = searchGoogleBooks(q)
-    .then((list) => {
-      const c = list.find((b) => b.cover)?.cover || '';
-      coverCache[book.pid] = c;
-      try { localStorage.setItem(COVER_KEY, JSON.stringify(coverCache)); } catch { /* 容量オーバーは無視 */ }
-      return c;
-    })
+  const order = book.lang === 'ja' ? [googleCover, openLibraryCover] : [openLibraryCover, googleCover];
+  const p = limited(async () => {
+    let anyOk = false;
+    for (const fn of order) {
+      try {
+        const url = await fn(title, author);
+        anyOk = true;
+        if (url) return url;
+      } catch { /* 次の取得元へ */ }
+    }
+    if (!anyOk) throw new Error('network');
+    return '';
+  })
+    .then((url) => { coverCache[book.pid] = url || { miss: Date.now() }; saveCovers(); return url; })
     .catch(() => '')
     .finally(() => inflight.delete(book.pid));
   inflight.set(book.pid, p);

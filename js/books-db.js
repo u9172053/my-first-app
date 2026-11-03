@@ -227,5 +227,3 @@ export const JA_CHAR_PRESETS = [
   { label: '幼年童話', chars: 10000 },
   { label: '児童書', chars: 40000 },
 ];
-
-export const MILESTONES = [10000, 30000, 50000, 100000, 200000, 300000, 500000, 1000000, 2000000, 3000000];

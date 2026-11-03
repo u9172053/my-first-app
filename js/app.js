@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { PRESET_BOOKS, JA_CHAR_PRESETS, MILESTONES } from './books-db.js';
+import { PRESET_BOOKS, JA_CHAR_PRESETS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
 import { searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
@@ -94,15 +94,11 @@ function renderStats() {
   const month = aggregate(logs.filter((l) => l.date.startsWith(mPrefix)));
   const all = aggregate(logs);
   const st = streak(logs);
-  const next = MILESTONES.find((m) => m > all.en) || all.en;
-  const prev = [...MILESTONES].reverse().find((m) => m <= all.en) || 0;
-  const pct = next === prev ? 100 : Math.min(100, ((all.en - prev) / (next - prev)) * 100);
   $('#stats').innerHTML = `
     <div class="stat en"><div class="lbl">${viewM + 1}月の英語</div><div class="val">${fmt(month.en)}<small>語</small></div></div>
     <div class="stat ja"><div class="lbl">${viewM + 1}月の日本語</div><div class="val">${fmt(month.jaBooks)}<small>冊</small></div><div class="muted small">${month.jaChars ? '約' + fmt(month.jaChars) + '字' : '&nbsp;'}</div></div>
     <div class="stat"><div class="lbl">連続記録</div><div class="val">${st}<small>日</small> ${st >= 3 ? '🔥' : ''}</div></div>
-    <div class="stat"><div class="lbl">英語の累計</div><div class="val">${fmt(all.en)}<small>語</small></div></div>
-    <div class="stat wide"><div class="lbl">🏁 次の目標：${fmt(next)}語まであと ${fmt(Math.max(0, next - all.en))}語</div><div class="progress"><div style="width:${pct}%"></div></div></div>`;
+    <div class="stat"><div class="lbl">英語の累計</div><div class="val">${fmt(all.en)}<small>語</small></div></div>`;
 }
 
 const shortNum = (n) => n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '万' : fmt(n);
@@ -147,6 +143,7 @@ function renderReco() {
       let score = Math.abs(b.lv - target);
       if (b.lv < (avg ?? 0) - 0.4) score += 2; // 簡単すぎは下げる
       if (recentSeries.has(b.series)) score -= 0.25; // 同じシリーズの続きは少し優先
+      if (/1冊/.test(b.title)) score += 0.35; // 「シリーズ（1冊）」より具体的な本を優先
       return { b, score };
     })
     .sort((x, y) => x.score - y.score);
@@ -156,23 +153,32 @@ function renderReco() {
     const key = b.series || b.pid;
     if (used.has(key)) continue;
     used.add(key); out.push(b);
-    if (out.length >= 4) break;
+    if (out.length >= 8) break;
   }
   $('#recoNote').textContent = avg == null
     ? 'まずはこんな本から始めてみませんか？'
     : `最近読んでいる本のレベル（目安 ${avg.toFixed(1)}）から、少しだけステップアップした本を選びました。`;
   $('#recoList').innerHTML = out.map((b) => `
     <div class="reco">
-      <div class="top-row">
-        <div class="cover" data-pid="${b.pid}">${coverInner(cachedCover(b.pid), b.lang)}</div>
-        <div class="grow"><div class="t">${esc(b.title)}</div><div class="why">約${fmt(b.count)}語・${esc(b.series || b.author)}</div></div>
-      </div>
+      <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
+      <div class="t">${esc(b.title)}</div>
+      <div class="why">約${fmt(b.count)}語・${esc(b.series || b.author)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>
       </div>
     </div>`).join('');
-  out.forEach((b) => loadCoverInto(b, document.querySelector(`#recoList .cover[data-pid="${b.pid}"]`)));
+  out.forEach((b) => {
+    const el = document.querySelector(`#recoList .reco-img[data-pid="${b.pid}"]`);
+    if (cachedCover(b.pid) !== undefined) return;
+    fetchPresetCover(b).then((url) => { if (url && el?.isConnected) el.innerHTML = recoCover(url, b); });
+  });
+}
+
+// おすすめ用の大きい表紙（画像がなければ本の形のカードにタイトルを表示）
+function recoCover(url, b) {
+  const ph = `<span class="ph ${b.lang}"><span>${esc(b.series || b.title.replace(/[（(].*?[)）]/g, ''))}</span></span>`;
+  return url ? `<img src="${esc(url)}" alt="${esc(b.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML=this.dataset.ph" data-ph="${esc(ph)}">` : ph;
 }
 
 function estimateLevel(words) {
@@ -183,7 +189,8 @@ function estimateLevel(words) {
 }
 
 function coverInner(url, lang) {
-  return url ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : (lang === 'ja' ? '📕' : '📘');
+  const icon = lang === 'ja' ? '📕' : '📘';
+  return url ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='${icon}'">` : icon;
 }
 function loadCoverInto(book, el) {
   if (!el || cachedCover(book.pid) !== undefined) return;
@@ -255,10 +262,10 @@ function renderSearchEmpty() {
   let html = '';
   if (recent.length) {
     html += '<div class="res-label">🔁 最近読んだ本（もう一度読んだ時に）</div>' +
-      recent.map((l) => itemHtml({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid }, 'r')).join('');
+      recent.map((l) => itemHtml({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid, exact: true }, 'r')).join('');
   }
   html += '<div class="res-label">⭐ 人気の本</div>' + popular.map((b) => itemHtml(b, 'p')).join('');
-  setResults(html, [...recent.map((l) => ({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid })), ...popular]);
+  setResults(html, [...recent.map((l) => ({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid, exact: true })), ...popular]);
 }
 
 let resultBooks = [];
@@ -275,7 +282,8 @@ let itemIdx = 0;
 function itemHtml(b) {
   const i = itemIdx++;
   const cover = b.cover || (b.pid ? cachedCover(b.pid) : '');
-  const n = b.count ? (b.lang === 'en' ? `${fmt(b.count)}語` : `約${fmt(b.count)}字`) : (b.lang === 'en' ? '語数？' : '');
+  const approx = b.pid && !b.exact ? '約' : '';
+  const n = b.count ? (b.lang === 'en' ? `${approx}${fmt(b.count)}語` : `${approx}${fmt(b.count)}字`) : (b.lang === 'en' ? '語数？' : '');
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
     <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}</div></div>

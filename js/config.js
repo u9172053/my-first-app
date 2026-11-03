@@ -14,6 +14,11 @@ export const CONFIG = {
   // 空欄のままだと Google ログインボタンは非表示（端末保存のみ）
   googleClientId: '949712431544-nfs0vmjg38hnr2qcun17b6t925n5ri67.apps.googleusercontent.com',
 
+  // Google Books API キー（本の検索・表紙用。キーなしだと共有枠が尽きて動かないことがある）
+  // Google Cloud →「APIとサービス」→「認証情報」→「APIキーを作成」で発行し、
+  // 「ウェブサイト」制限と「Books API」制限をかけておけば公開しても安全です
+  googleBooksApiKey: '',
+
   // Amazon アソシエイトのトラッキングID（例: 'ouchieigo-22'）
   amazonTag: '',
   // 楽天アフィリエイトID（例: '1a2b3c4d.5e6f7a8b.1a2b3c4d.5e6f7a8b'）
