@@ -12,7 +12,7 @@ export const CONFIG = {
   // Google Cloud で発行した OAuth クライアントID（English Quest で使ったものを流用可）
   // 例: '1234567890-xxxxxxxx.apps.googleusercontent.com'
   // 空欄のままだと Google ログインボタンは非表示（端末保存のみ）
-  googleClientId: '',
+  googleClientId: '949712431544-nfs0vmjg38hnr2qcun17b6t925n5ri67.apps.googleusercontent.com',
 
   // Amazon アソシエイトのトラッキングID（例: 'ouchieigo-22'）
   amazonTag: '',
