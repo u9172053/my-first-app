@@ -128,51 +128,80 @@ function renderCalendar() {
 }
 
 // ---------------- おすすめ ----------------
+// 英語：最近読んだ英語の本のレベル平均から「同じくらい」4冊＋「少し上」4冊
+// 日本語：最近読んだ日本語の本の文字数から「同じくらい」4冊＋「少し長め」4冊
+let recoLang = 'en';
+
+function pickBooks(cands, scoreFn, n, used) {
+  const out = [];
+  for (const { b, s } of cands.map((b) => ({ b, s: scoreFn(b) })).filter((x) => x.s != null).sort((x, y) => x.s - y.s)) {
+    const key = b.series || b.pid;
+    if (used.has(key) || used.has(b.pid)) continue;
+    used.add(key); used.add(b.pid); out.push(b);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+
 function renderReco() {
   const logs = logsFor().slice().sort((a, b) => (a.date < b.date ? 1 : -1));
   const readPids = new Set(logs.map((l) => l.pid).filter(Boolean));
   const readTitles = new Set(logs.map((l) => l.title));
-  const enRecent = logs.filter((l) => l.lang === 'en').slice(0, 15);
-  const levels = enRecent.map((l) => PRESET_BOOKS.find((b) => b.pid === l.pid)?.lv ?? estimateLevel(l.count)).filter((v) => v != null);
-  const avg = levels.length ? levels.reduce((s, v) => s + v, 0) / levels.length : null;
-  const target = avg == null ? 0.4 : avg + 0.3;
-  const recentSeries = new Set(enRecent.map((l) => PRESET_BOOKS.find((b) => b.pid === l.pid)?.series).filter(Boolean));
+  const recent = logs.filter((l) => l.lang === recoLang).slice(0, 15);
+  const preset = (l) => PRESET_BOOKS.find((b) => b.pid === l.pid);
+  const recentSeries = new Set(recent.map((l) => preset(l)?.series).filter(Boolean));
+  const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
+  const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0);
+  const used = new Set();
+  let same, up, note;
 
-  const cands = PRESET_BOOKS.filter((b) => b.lang === 'en' && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title))
-    .map((b) => {
-      let score = Math.abs(b.lv - target);
-      if (b.lv < (avg ?? 0) - 0.4) score += 2; // 簡単すぎは下げる
-      if (recentSeries.has(b.series)) score -= 0.25; // 同じシリーズの続きは少し優先
-      if (/1冊/.test(b.title)) score += 0.35; // 「シリーズ（1冊）」より具体的な本を優先
-      return { b, score };
-    })
-    .sort((x, y) => x.score - y.score);
-  // シリーズが偏らないように
-  const out = [], used = new Set();
-  for (const { b } of cands) {
-    const key = b.series || b.pid;
-    if (used.has(key)) continue;
-    used.add(key); out.push(b);
-    if (out.length >= 8) break;
+  if (recoLang === 'en') {
+    const levels = recent.map((l) => preset(l)?.lv ?? estimateLevel(l.count)).filter((v) => v != null);
+    const avg = levels.length ? levels.reduce((s, v) => s + v, 0) / levels.length : null;
+    const base = avg ?? 0.3;
+    same = pickBooks(cands, (b) => (Math.abs(b.lv - base) <= 0.5 ? Math.abs(b.lv - base) + bonus(b) : null), 4, used);
+    up = pickBooks(cands, (b) => (b.lv > base + 0.2 && b.lv <= base + 1.5 ? Math.abs(b.lv - (base + 0.7)) + bonus(b) : null), 4, used);
+    // 足りない時は条件をゆるめて補う
+    if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.lv - base), 4 - same.length, used));
+    if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.lv > base ? b.lv - base : null), 4 - up.length, used));
+    note = avg == null ? 'まだ英語の記録がないので、はじめての1冊におすすめの本を選びました。'
+      : `最近読んでいる英語の本のレベル（目安 ${avg.toFixed(1)}）をもとに選びました。`;
+  } else {
+    const chars = recent.map((l) => l.count || preset(l)?.count).filter((v) => v > 0);
+    const avg = chars.length ? chars.reduce((s, v) => s + v, 0) / chars.length : null;
+    const base = avg ?? 300;
+    const dist = (b, target) => Math.abs(Math.log(b.count / target));
+    same = pickBooks(cands, (b) => (b.count >= base / 2.5 && b.count <= base * 2 ? dist(b, base) + bonus(b) : null), 4, used);
+    up = pickBooks(cands, (b) => (b.count > base * 1.5 && b.count <= base * 8 ? dist(b, base * 3) + bonus(b) : null), 4, used);
+    if (same.length < 4) same.push(...pickBooks(cands, (b) => dist(b, base), 4 - same.length, used));
+    if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.count > base ? dist(b, base * 3) : null), 4 - up.length, used));
+    note = avg == null ? 'まだ日本語の記録がないので、小さい子に人気の絵本を選びました。'
+      : `最近読んでいる日本語の本の長さ（約${fmt(avg)}字）をもとに選びました。`;
   }
-  $('#recoNote').textContent = avg == null
-    ? 'まずはこんな本から始めてみませんか？'
-    : `最近読んでいる本のレベル（目安 ${avg.toFixed(1)}）から、少しだけステップアップした本を選びました。`;
-  $('#recoList').innerHTML = out.map((b) => `
+
+  $('#recoNote').textContent = note;
+  $('#recoSame').innerHTML = same.map(recoCard).join('');
+  $('#recoUp').innerHTML = up.map(recoCard).join('') || '<p class="muted small">今のところ、これより上のおすすめはありません。</p>';
+  [...same, ...up].forEach((b) => {
+    if (cachedCover(b.pid) !== undefined) return;
+    fetchPresetCover(b).then((url) => {
+      document.querySelectorAll(`.reco-img[data-pid="${b.pid}"]`).forEach((el) => { if (url) el.innerHTML = recoCover(url, b); });
+    });
+  });
+}
+
+function recoCard(b) {
+  const unit = b.lang === 'en' ? '語' : '字';
+  return `
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
-      <div class="why">約${fmt(b.count)}語・${esc(b.series || b.author)}</div>
+      <div class="why">約${fmt(b.count)}${unit}・${esc(b.series || b.author)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>
       </div>
-    </div>`).join('');
-  out.forEach((b) => {
-    const el = document.querySelector(`#recoList .reco-img[data-pid="${b.pid}"]`);
-    if (cachedCover(b.pid) !== undefined) return;
-    fetchPresetCover(b).then((url) => { if (url && el?.isConnected) el.innerHTML = recoCover(url, b); });
-  });
+    </div>`;
 }
 
 // おすすめ用の大きい表紙（画像がなければ本の形のカードにタイトルを表示）
@@ -536,6 +565,7 @@ function bind() {
     editing = null; $('#addDlg').close(); commit(); toast('削除しました');
   };
 
+  $('#recoTabs').addEventListener('change', (e) => { recoLang = e.target.value; renderReco(); });
   $('#shareOpen').onclick = openShare;
   $('#shareName').onchange = () => { state.settings.shareShowName = $('#shareName').checked; saveLocal(state); drawShare(); };
   $('#shareSave').onclick = async () => {

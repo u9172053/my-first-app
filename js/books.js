@@ -3,7 +3,7 @@
 //  （openBD / Google Books の無料APIを利用者のブラウザから直接呼び出し）
 // ============================================================
 import { CONFIG } from './config.js';
-import { PRESET_BOOKS } from './books-db.js';
+import { PRESET_BOOKS, COVER_QUERY } from './books-db.js';
 
 export const norm = (s = '') =>
   s.normalize('NFKC').toLowerCase()
@@ -90,11 +90,11 @@ export async function lookupIsbn(isbn) {
 // 英語の本：Open Library（キー不要）→ Google Books
 // 日本語の本：Google Books → Open Library
 // 見つからなかった結果は7日間だけ覚えておき、通信エラーは覚えない
-const COVER_KEY = 'tadoku-cover-cache-v2';
+const COVER_KEY = 'tadoku-cover-cache-v3';
 const MISS_TTL = 7 * 24 * 3600 * 1000;
 let coverCache = {};
 try { coverCache = JSON.parse(localStorage.getItem(COVER_KEY) || '{}'); } catch { coverCache = {}; }
-try { localStorage.removeItem('tadoku-cover-cache'); } catch { /* 旧キャッシュ削除 */ }
+try { ['tadoku-cover-cache', 'tadoku-cover-cache-v2'].forEach((k) => localStorage.removeItem(k)); } catch { /* 旧キャッシュ削除 */ }
 const inflight = new Map();
 const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 
@@ -141,11 +141,18 @@ function limited(fn) {
 export function fetchPresetCover(book) {
   const c = cachedCover(book.pid);
   if (c !== undefined) return Promise.resolve(c);
-  if (isGeneric(book.title)) { coverCache[book.pid] = { miss: Date.now() }; return Promise.resolve(''); }
+  let title, author;
+  if (isGeneric(book.title)) {
+    // シリーズ代表作の表紙を使う（代表作がないシリーズは表紙なし）
+    const q = COVER_QUERY[book.series];
+    if (!q) { coverCache[book.pid] = { miss: Date.now() }; return Promise.resolve(''); }
+    [title, author] = q;
+  } else {
+    const base = book.title.replace(/[（(].*?[)）]/g, '').trim();
+    title = base.replace(/^.*#\d+\s*/, '').trim() || base.replace(/\s*#\d+$/, '').trim();
+    author = book.author.split(/[\/,]/)[0].trim();
+  }
   if (inflight.has(book.pid)) return inflight.get(book.pid);
-  const base = book.title.replace(/[（(].*?[)）]/g, '').trim();
-  const title = base.replace(/^.*#\d+\s*/, '').trim() || base.replace(/\s*#\d+$/, '').trim();
-  const author = book.author.split(/[\/,]/)[0].trim();
   const order = book.lang === 'ja' ? [googleCover, openLibraryCover] : [openLibraryCover, googleCover];
   const p = limited(async () => {
     let anyOk = false;

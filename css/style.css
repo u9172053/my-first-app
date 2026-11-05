@@ -180,6 +180,10 @@ label input { margin-top: 3px; color: var(--ink); font-weight: 400; font-size: 1
 .child-row input { margin: 0; }
 .file-btn { margin: 0; font-size: 15px; color: var(--ink); }
 
+.reco-tabs { margin: 8px 0 4px; }
+.reco-tabs input[value=en]:checked + span { border-color: var(--en); background: var(--en-soft); color: var(--en); }
+.reco-tabs input[value=ja]:checked + span { border-color: var(--ja); background: var(--ja-soft); color: var(--ja); }
+.reco-h { font-size: 14px; margin: 14px 0 0; }
 .reco-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
 .reco { border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 4px; background: #fffdf9; }
 .reco-img { display: grid; place-items: center; aspect-ratio: 3 / 4; border-radius: 10px; background: #f6efe6; overflow: hidden; margin-bottom: 4px; }
