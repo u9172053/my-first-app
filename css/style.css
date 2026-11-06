@@ -188,9 +188,12 @@ label input { margin-top: 3px; color: var(--ink); font-weight: 400; font-size: 1
 .reco-h { font-size: 14px; margin: 14px 0 0; }
 .reco-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 8px; }
 .reco { border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 4px; background: #fffdf9; }
-.reco-img { display: grid; place-items: center; aspect-ratio: 3 / 4; border-radius: 10px; background: #f6efe6; overflow: hidden; margin-bottom: 4px; }
+.reco-img { text-decoration: none; display: grid; place-items: center; aspect-ratio: 3 / 4; border-radius: 10px; background: #f6efe6; overflow: hidden; margin-bottom: 4px; }
 .reco-img img { width: 100%; height: 100%; object-fit: contain; }
 .reco .t { font-weight: 700; font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.reco .age { align-self: flex-start; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 0 8px; }
+.reco .age.ja { background: var(--ja-soft); color: var(--ja); }
+.reco .age.en { background: var(--en-soft); color: var(--en); }
 .reco .why { font-size: 11px; color: var(--sub); }
 .reco .links { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
 .reco .links .btn { flex: 1; }

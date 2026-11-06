@@ -168,7 +168,7 @@ function renderReco() {
     if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.lv - base), 4 - same.length, used));
     if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.lv > base ? b.lv - base : null), 4 - up.length, used));
     note = avg == null ? 'まだ英語の記録がないので、はじめての1冊におすすめの本を選びました。'
-      : `最近読んでいる英語の本のレベル（目安 ${avg.toFixed(1)}）をもとに選びました。`;
+      : `最近読んでいる英語の本は「${enAge(avg)}」くらい。それをもとに選びました。`;
   } else {
     const chars = recent.map((l) => l.count || preset(l)?.count).filter((v) => v > 0);
     const avg = chars.length ? chars.reduce((s, v) => s + v, 0) / chars.length : null;
@@ -179,7 +179,7 @@ function renderReco() {
     if (same.length < 4) same.push(...pickBooks(cands, (b) => dist(b, base), 4 - same.length, used));
     if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.count > base ? dist(b, base * 3) : null), 4 - up.length, used));
     note = avg == null ? 'まだ日本語の記録がないので、小さい子に人気の絵本を選びました。'
-      : `最近読んでいる日本語の本の長さ（約${fmt(avg)}字）をもとに選びました。`;
+      : `最近読んでいる日本語の本は「${jaAge(avg)}」くらい（約${fmt(avg)}字）。それをもとに選びました。`;
   }
 
   $('#recoNote').textContent = note;
@@ -200,6 +200,7 @@ function recoCard(b) {
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
+      <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.count)}</div>
       <div class="why">約${fmt(b.count)}${unit}・${esc(b.series || b.author)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
@@ -249,6 +250,16 @@ window.coverNext = (img) => {
     });
   } else img.src = rest[0];
 };
+
+// 対象年齢の目安（英語は英語圏の子ども基準、日本語は文字数から）
+function enAge(lv) {
+  const t = [[0.5, '1〜3歳'], [1.0, '3〜5歳'], [1.6, '4〜6歳'], [2.4, '5〜7歳'], [3.5, '6〜8歳'], [5.0, '8〜10歳'], [6.5, '9〜12歳']];
+  return '英語圏の' + ((t.find(([max]) => lv <= max) || [0, '10歳〜'])[1]) + '向け';
+}
+function jaAge(chars) {
+  const t = [[200, '0〜2歳'], [700, '1〜3歳'], [2000, '3〜5歳'], [5000, '4〜6歳'], [15000, '5〜7歳'], [50000, '小学校中学年']];
+  return ((t.find(([max]) => chars <= max) || [0, '小学校高学年'])[1]) + '向け';
+}
 
 function estimateLevel(words) {
   if (!words) return null;
