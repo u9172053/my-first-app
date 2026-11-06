@@ -103,6 +103,8 @@ const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 
 // 戻り値: URL文字列 / ''（表紙なし確定） / undefined（未取得）
 export function cachedCover(pid) {
+  const b = PRESET_BOOKS.find((x) => x.pid === pid);
+  if (b?.coverIsbn) return isbnCoverList(b.coverIsbn);
   const v = coverCache[pid];
   if (v === undefined) return undefined;
   if (typeof v === 'string') return v;
@@ -153,20 +155,19 @@ function limited(fn) {
   });
 }
 
-// ISBN が分かっている本：Google Books → openBD → 国立国会図書館 の順
-async function isbnCover(isbn) {
-  try {
-    const hit = (await searchGoogleBooks(`isbn:${isbn}`)).find((b) => b.cover && !b.cover.includes('ndlsearch'));
-    if (hit) return hit.cover;
-  } catch { /* 次へ */ }
-  try {
-    const c = (await (await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`)).json())?.[0]?.summary?.cover;
-    if (c) return c;
-  } catch { /* 次へ */ }
-  return ndlThumb(isbn);
+// ISBN が分かっている本は通信なしで候補URLを並べる（読み込めなければ表示側で次の候補へ）
+//   版元ドットコム(openBD) → 国立国会図書館 → Google Books
+export function isbnCoverList(isbn) {
+  if (!/^97[89]\d{10}$/.test(isbn || '')) return '';
+  return [
+    `https://cover.openbd.jp/${isbn}.jpg`,
+    `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`,
+    `https://books.google.com/books/content?vid=ISBN${isbn}&printsec=frontcover&img=1&zoom=1`,
+  ].join('|');
 }
 
 export function fetchPresetCover(book) {
+  if (book.coverIsbn) return Promise.resolve(isbnCoverList(book.coverIsbn));
   const c = cachedCover(book.pid);
   if (c !== undefined) return Promise.resolve(c);
   let title, author;
@@ -181,13 +182,6 @@ export function fetchPresetCover(book) {
     author = book.author.split(/[\/,]/)[0].trim();
   }
   if (inflight.has(book.pid)) return inflight.get(book.pid);
-  if (book.coverIsbn) {
-    const p = limited(() => isbnCover(book.coverIsbn))
-      .then((url) => { coverCache[book.pid] = url; saveCovers(); return url; })
-      .finally(() => inflight.delete(book.pid));
-    inflight.set(book.pid, p);
-    return p;
-  }
   const order = book.lang === 'ja' ? [googleCover, openLibraryCover] : [openLibraryCover, googleCover];
   const p = limited(async () => {
     let allOk = true;

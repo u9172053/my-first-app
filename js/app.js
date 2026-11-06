@@ -207,8 +207,21 @@ function recoCard(b) {
 // おすすめ用の大きい表紙（画像がなければ本の形のカードにタイトルを表示）
 function recoCover(url, b) {
   const ph = `<span class="ph ${b.lang}"><span>${esc(b.series || b.title.replace(/[（(].*?[)）]/g, ''))}</span></span>`;
-  return url ? `<img src="${esc(url)}" alt="${esc(b.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML=this.dataset.ph" data-ph="${esc(ph)}">` : ph;
+  return url ? coverImg(url, ph, b.title) : ph;
 }
+
+// 表紙画像：url は「候補1|候補2|…」。読み込めない・極小（画像なしの代わり画像）なら次の候補へ
+function coverImg(url, fallbackHtml, alt) {
+  const [first, ...rest] = String(url).split('|');
+  return `<img src="${esc(first)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer"
+    data-alt="${esc(rest.join('|'))}" data-ph="${esc(fallbackHtml)}"
+    onerror="coverNext(this)" onload="if(this.naturalWidth<40||this.naturalHeight<40)coverNext(this)">`;
+}
+window.coverNext = (img) => {
+  const rest = (img.dataset.alt || '').split('|').filter(Boolean);
+  if (rest.length) { img.dataset.alt = rest.slice(1).join('|'); img.src = rest[0]; }
+  else img.outerHTML = img.dataset.ph;
+};
 
 function estimateLevel(words) {
   if (!words) return null;
@@ -219,7 +232,7 @@ function estimateLevel(words) {
 
 function coverInner(url, lang) {
   const icon = lang === 'ja' ? '📕' : '📘';
-  return url ? `<img src="${esc(url)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='${icon}'">` : icon;
+  return url ? coverImg(url, icon, '') : icon;
 }
 function loadCoverInto(book, el) {
   if (!el || cachedCover(book.pid) !== undefined) return;
