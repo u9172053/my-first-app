@@ -33,13 +33,16 @@ export function findPresetByTitle(title) {
     PRESET_BOOKS.find((b) => n.length > 5 && norm(b.title).startsWith(n)) || null;
 }
 
+// 国立国会図書館サーチの書影（日本の本向け。画像がなければ表示側で代わりのアイコンに切り替え）
+const ndlThumb = (isbn) => (/^97[89]\d{10}$/.test(isbn || '') ? `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg` : '');
+
 const isJapanese = (s = '') => /[぀-ヿ一-鿿]/.test(s);
 
 function mapGoogle(item) {
   const v = item.volumeInfo || {};
   const ids = v.industryIdentifiers || [];
   const isbn = (ids.find((i) => i.type === 'ISBN_13') || ids.find((i) => i.type === 'ISBN_10'))?.identifier || '';
-  const cover = (v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '').replace(/^http:/, 'https:');
+  const cover = (v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '').replace(/^http:/, 'https:') || ndlThumb(isbn);
   const title = [v.title, v.subtitle].filter(Boolean).join(': ');
   return {
     title, author: (v.authors || []).join(', '), isbn, cover,
@@ -65,7 +68,7 @@ export async function lookupIsbn(isbn) {
     const j = await r.json();
     const s = j?.[0]?.summary;
     if (s?.title) {
-      return { title: s.title, author: (s.author || '').replace(/／著.*$/, ''), isbn, cover: s.cover || '', lang: isJapanese(s.title) ? 'ja' : 'en' };
+      return { title: s.title, author: (s.author || '').replace(/／著.*$/, ''), isbn, cover: s.cover || ndlThumb(isbn), lang: isJapanese(s.title) ? 'ja' : 'en' };
     }
   } catch { /* 次へ */ }
   try {
@@ -90,11 +93,11 @@ export async function lookupIsbn(isbn) {
 // 英語の本：Open Library（キー不要）→ Google Books
 // 日本語の本：Google Books → Open Library
 // 見つからなかった結果は7日間だけ覚えておき、通信エラーは覚えない
-const COVER_KEY = 'tadoku-cover-cache-v3';
+const COVER_KEY = 'tadoku-cover-cache-v4';
 const MISS_TTL = 7 * 24 * 3600 * 1000;
 let coverCache = {};
 try { coverCache = JSON.parse(localStorage.getItem(COVER_KEY) || '{}'); } catch { coverCache = {}; }
-try { ['tadoku-cover-cache', 'tadoku-cover-cache-v2'].forEach((k) => localStorage.removeItem(k)); } catch { /* 旧キャッシュ削除 */ }
+try { ['tadoku-cover-cache', 'tadoku-cover-cache-v2', 'tadoku-cover-cache-v3'].forEach((k) => localStorage.removeItem(k)); } catch { /* 旧キャッシュ削除 */ }
 const inflight = new Map();
 const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 
@@ -120,9 +123,21 @@ async function openLibraryCover(title, author) {
   return d ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '';
 }
 
+// Google Books で探す。表紙画像がない時は、見つかった ISBN で
+// openBD（版元ドットコムの書影）→ 国立国会図書館の書影 の順に探す（日本の絵本に強い）
 async function googleCover(title, author) {
-  const list = await searchGoogleBooks(`intitle:${title}` + (author ? ` inauthor:${author}` : ''));
-  return list.find((b) => b.cover)?.cover || '';
+  let list = await searchGoogleBooks(`intitle:${title}` + (author ? ` inauthor:${author}` : ''));
+  if (!list.length && author) list = await searchGoogleBooks(`intitle:${title}`);
+  const hit = list.find((b) => b.cover);
+  if (hit) return hit.cover;
+  const isbns = [...new Set(list.map((b) => b.isbn).filter((i) => /^97[89]\d{10}$/.test(i)))].slice(0, 5);
+  if (!isbns.length) return '';
+  try {
+    const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbns.join(',')}`);
+    const c = (await r.json()).find((x) => x?.summary?.cover)?.summary.cover;
+    if (c) return c;
+  } catch { /* 次へ */ }
+  return ndlThumb(isbns[0]);
 }
 
 // 同時に問い合わせる数を制限（相手サーバーに優しく）
@@ -155,15 +170,15 @@ export function fetchPresetCover(book) {
   if (inflight.has(book.pid)) return inflight.get(book.pid);
   const order = book.lang === 'ja' ? [googleCover, openLibraryCover] : [openLibraryCover, googleCover];
   const p = limited(async () => {
-    let anyOk = false;
+    let allOk = true;
     for (const fn of order) {
       try {
         const url = await fn(title, author);
-        anyOk = true;
         if (url) return url;
-      } catch { /* 次の取得元へ */ }
+      } catch { allOk = false; /* 次の取得元へ */ }
     }
-    if (!anyOk) throw new Error('network');
+    // どこかで通信エラーがあった時は「表紙なし」を覚えない（次回また探す）
+    if (!allOk) throw new Error('network');
     return '';
   })
     .then((url) => { coverCache[book.pid] = url || { miss: Date.now() }; saveCovers(); return url; })
