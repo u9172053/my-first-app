@@ -17,7 +17,7 @@ export const CONFIG = {
   // Google Books API キー（本の検索・表紙用。キーなしだと共有枠が尽きて動かないことがある）
   // Google Cloud →「APIとサービス」→「認証情報」→「APIキーを作成」で発行し、
   // 「ウェブサイト」制限と「Books API」制限をかけておけば公開しても安全です
-  googleBooksApiKey: '',
+  googleBooksApiKey: 'AIzaSyDHE8aSxDB8LH90qnJnuRZF3Lf_AUTGwAg',
 
   // Amazon アソシエイトのトラッキングID（例: 'ouchieigo-22'）
   amazonTag: '',
