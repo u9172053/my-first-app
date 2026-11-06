@@ -93,11 +93,11 @@ export async function lookupIsbn(isbn) {
 // 英語の本：Open Library（キー不要）→ Google Books
 // 日本語の本：Google Books → Open Library
 // 見つからなかった結果は7日間だけ覚えておき、通信エラーは覚えない
-const COVER_KEY = 'tadoku-cover-cache-v4';
+const COVER_KEY = 'tadoku-cover-cache-v5';
 const MISS_TTL = 7 * 24 * 3600 * 1000;
 let coverCache = {};
 try { coverCache = JSON.parse(localStorage.getItem(COVER_KEY) || '{}'); } catch { coverCache = {}; }
-try { ['tadoku-cover-cache', 'tadoku-cover-cache-v2', 'tadoku-cover-cache-v3'].forEach((k) => localStorage.removeItem(k)); } catch { /* 旧キャッシュ削除 */ }
+try { ['tadoku-cover-cache', 'tadoku-cover-cache-v2', 'tadoku-cover-cache-v3', 'tadoku-cover-cache-v4'].forEach((k) => localStorage.removeItem(k)); } catch { /* 旧キャッシュ削除 */ }
 const inflight = new Map();
 const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 
@@ -153,6 +153,19 @@ function limited(fn) {
   });
 }
 
+// ISBN が分かっている本：Google Books → openBD → 国立国会図書館 の順
+async function isbnCover(isbn) {
+  try {
+    const hit = (await searchGoogleBooks(`isbn:${isbn}`)).find((b) => b.cover && !b.cover.includes('ndlsearch'));
+    if (hit) return hit.cover;
+  } catch { /* 次へ */ }
+  try {
+    const c = (await (await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`)).json())?.[0]?.summary?.cover;
+    if (c) return c;
+  } catch { /* 次へ */ }
+  return ndlThumb(isbn);
+}
+
 export function fetchPresetCover(book) {
   const c = cachedCover(book.pid);
   if (c !== undefined) return Promise.resolve(c);
@@ -168,6 +181,13 @@ export function fetchPresetCover(book) {
     author = book.author.split(/[\/,]/)[0].trim();
   }
   if (inflight.has(book.pid)) return inflight.get(book.pid);
+  if (book.coverIsbn) {
+    const p = limited(() => isbnCover(book.coverIsbn))
+      .then((url) => { coverCache[book.pid] = url; saveCovers(); return url; })
+      .finally(() => inflight.delete(book.pid));
+    inflight.set(book.pid, p);
+    return p;
+  }
   const order = book.lang === 'ja' ? [googleCover, openLibraryCover] : [openLibraryCover, googleCover];
   const p = limited(async () => {
     let allOk = true;
