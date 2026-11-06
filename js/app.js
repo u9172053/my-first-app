@@ -95,10 +95,11 @@ function renderStats() {
   const all = aggregate(logs);
   const st = streak(logs);
   $('#stats').innerHTML = `
-    <div class="stat en"><div class="lbl">${viewM + 1}月の英語</div><div class="val">${fmt(month.en)}<small>語</small></div></div>
     <div class="stat ja"><div class="lbl">${viewM + 1}月の日本語</div><div class="val">${fmt(month.jaBooks)}<small>冊</small></div><div class="muted small">${month.jaChars ? '約' + fmt(month.jaChars) + '字' : '&nbsp;'}</div></div>
-    <div class="stat"><div class="lbl">連続記録</div><div class="val">${st}<small>日</small> ${st >= 3 ? '🔥' : ''}</div></div>
-    <div class="stat"><div class="lbl">英語の累計</div><div class="val">${fmt(all.en)}<small>語</small></div></div>`;
+    <div class="stat en"><div class="lbl">${viewM + 1}月の英語</div><div class="val">${fmt(month.en)}<small>語</small></div><div class="muted small">${month.enBooks ? fmt(month.enBooks) + '冊' : '&nbsp;'}</div></div>
+    <div class="stat"><div class="lbl">日本語の累計</div><div class="val">${fmt(all.jaBooks)}<small>冊</small></div></div>
+    <div class="stat"><div class="lbl">英語の累計</div><div class="val">${fmt(all.en)}<small>語</small></div></div>
+    <div class="stat wide streak"><div class="lbl">連続記録</div><div class="val">${st}<small>日</small> ${st >= 3 ? '🔥' : ''}</div></div>`;
 }
 
 const shortNum = (n) => n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '万' : fmt(n);
@@ -117,20 +118,20 @@ function renderCalendar() {
     const has = a.en || a.jaBooks;
     html += `<button class="day ${has ? 'has' : ''} ${ds === tStr ? 'today' : ''} ${ds > tStr ? 'future' : ''}" data-date="${ds}">
       <span class="d">${d}</span>
-      ${a.en ? `<span class="w">${shortNum(a.en)}</span>` : ''}
       ${a.jaBooks ? `<span class="b">${a.jaBooks}冊</span>` : ''}
+      ${a.en ? `<span class="w">${shortNum(a.en)}</span>` : ''}
     </button>`;
   }
   $('#calGrid').innerHTML = html;
   const m = aggregate(logsFor().filter((l) => l.date.startsWith(`${viewY}-${pad(viewM + 1)}`)));
   const readDays = [...map.keys()].filter((k) => k.startsWith(`${viewY}-${pad(viewM + 1)}`)).length;
-  $('#monthSum').innerHTML = `<span class="en">英語 ${fmt(m.en)}語（${fmt(m.enBooks)}冊）</span><span class="ja">日本語 ${fmt(m.jaBooks)}冊</span><span>📅 ${readDays}日読んだ</span>`;
+  $('#monthSum').innerHTML = `<span class="ja">日本語 ${fmt(m.jaBooks)}冊</span><span class="en">英語 ${fmt(m.en)}語（${fmt(m.enBooks)}冊）</span><span>📅 ${readDays}日読んだ</span>`;
 }
 
 // ---------------- おすすめ ----------------
 // 英語：最近読んだ英語の本のレベル平均から「同じくらい」4冊＋「少し上」4冊
 // 日本語：最近読んだ日本語の本の文字数から「同じくらい」4冊＋「少し長め」4冊
-let recoLang = 'en';
+let recoLang = 'ja';
 
 function pickBooks(cands, scoreFn, n, used) {
   const out = [];
@@ -279,7 +280,7 @@ function renderDay() {
   if (!dayOpen) return;
   const logs = logsFor().filter((l) => l.date === dayOpen);
   const a = aggregate(logs);
-  $('#daySum').innerHTML = logs.length ? `<span class="en">英語 ${fmt(a.en)}語</span><span class="ja">日本語 ${a.jaBooks}冊${a.jaChars ? '（約' + fmt(a.jaChars) + '字）' : ''}</span>` : '<span class="muted">まだ記録がありません</span>';
+  $('#daySum').innerHTML = logs.length ? `<span class="ja">日本語 ${a.jaBooks}冊${a.jaChars ? '（約' + fmt(a.jaChars) + '字）' : ''}</span><span class="en">英語 ${fmt(a.en)}語</span>` : '<span class="muted">まだ記録がありません</span>';
   const multi = children().length > 1;
   $('#dayList').innerHTML = logs.map((l) => {
     const c = multi ? children().find((x) => x.id === l.childId) : null;
@@ -325,7 +326,7 @@ function renderSearchEmpty() {
     seen.add(l.title); recent.push(l);
     if (recent.length >= 8) break;
   }
-  const popular = ['Oxford Reading Tree Stage 1+（1冊）', 'Brown Bear, Brown Bear, What Do You See?', 'The Very Hungry Caterpillar', 'Elephant & Piggie（1冊・平均）', 'Frog and Toad Are Friends', 'Magic Tree House #1 Dinosaurs Before Dark']
+  const popular = ['はらぺこあおむし', 'ぐりとぐら', 'だるまさんが', 'Oxford Reading Tree Stage 1+（1冊）', 'Brown Bear, Brown Bear, What Do You See?', 'The Very Hungry Caterpillar', 'Elephant & Piggie（1冊・平均）', 'Frog and Toad Are Friends', 'Magic Tree House #1 Dinosaurs Before Dark']
     .map((t) => PRESET_BOOKS.find((b) => b.title === t)).filter(Boolean);
   let html = '';
   if (recent.length) {
@@ -495,12 +496,12 @@ function shareData() {
   for (const [date, ls] of byDay(mLogs)) days.set(+date.slice(8), aggregate(ls));
   const a = activeChild();
   const name = $('#shareName').checked && a !== 'all' ? children().find((c) => c.id === a)?.name : '';
-  return { year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, streak: streak(logs), days };
+  return { year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, streak: streak(logs), days };
 }
 async function drawShare() {
   const d = shareData();
   await renderShareImage($('#shareCanvas'), d);
-  const text = `${d.month}月の多読：英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）、日本語 ${fmt(d.jaBooks)}冊📚\n#${CONFIG.hashtags.join(' #')}`;
+  const text = `${d.month}月の読書きろく：日本語 ${fmt(d.jaBooks)}冊、英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）📚\n#${CONFIG.hashtags.join(' #')}`;
   $('#shareX').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(CONFIG.shareUrl)}`;
   $('#shareLine').href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(CONFIG.shareUrl)}&text=${encodeURIComponent(text)}`;
   $('#shareNative').dataset.text = text;
@@ -584,7 +585,7 @@ function bind() {
 
   $('#searchInput').addEventListener('input', onSearch);
   $('#searchResults').onclick = (e) => { const it = e.target.closest('.item[data-i]'); if (it) pickBook(resultBooks[+it.dataset.i]); };
-  $('#manualBtn').onclick = () => pickBook({ title: $('#searchInput').value.trim(), lang: /[぀-ヿ一-鿿]/.test($('#searchInput').value) ? 'ja' : 'en' });
+  $('#manualBtn').onclick = () => pickBook({ title: $('#searchInput').value.trim(), lang: /^[\x20-\x7e]+$/.test($('#searchInput').value.trim()) ? 'en' : 'ja' });
   $('#scanBtn').onclick = openScan;
   $('#backBtn').onclick = () => { if (editing) { $('#addDlg').close(); editing = null; } else showSearch(); };
   document.querySelectorAll('input[name=fLang]').forEach((r) => r.addEventListener('change', () => {

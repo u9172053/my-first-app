@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>多読きろく帳｜おうち英語の解体新書</title>
-<meta name="description" content="子どもの英語多読・日本語読書をカレンダーで記録。人気の本は検索やバーコードでかんたん登録。データはあなたの端末とGoogleドライブだけに保存されます。">
+<meta name="description" content="子どもの読書（日本語の絵本と英語の多読）をカレンダーで記録。人気の本は検索やバーコードでかんたん登録。データはあなたの端末とGoogleドライブだけに保存されます。">
 <meta property="og:type" content="website">
 <meta property="og:title" content="多読きろく帳｜おうち英語の解体新書">
-<meta property="og:description" content="読んだ本の語数をカレンダーで記録。英語・日本語を分けて集計、バーコードでかんたん登録。">
+<meta property="og:description" content="読んだ絵本をカレンダーで記録。日本語は冊数、英語は語数で集計、バーコードでかんたん登録。">
 <meta property="og:image" content="og.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#fff8ee">
@@ -43,7 +43,7 @@
       <h2 id="monthLabel"></h2>
       <button id="nextMonth" class="icon-btn" aria-label="次の月">›</button>
     </div>
-    <div class="legend"><span class="dot en"></span>英語（語）<span class="dot ja"></span>日本語（冊）</div>
+    <div class="legend"><span class="dot ja"></span>日本語（冊）<span class="dot en"></span>英語（語）</div>
     <div class="cal-grid cal-week"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
     <div id="calGrid" class="cal-grid"></div>
     <div class="month-sum" id="monthSum"></div>
@@ -64,8 +64,8 @@
       <h2>📖 つぎのおすすめ</h2><span class="pr">PR</span>
     </div>
     <div class="seg reco-tabs" id="recoTabs">
-      <label><input type="radio" name="recoLang" value="en" checked><span>🇬🇧 英語の本</span></label>
-      <label><input type="radio" name="recoLang" value="ja"><span>🇯🇵 日本語の絵本</span></label>
+      <label><input type="radio" name="recoLang" value="ja" checked><span>🇯🇵 日本語の絵本</span></label>
+      <label><input type="radio" name="recoLang" value="en"><span>🇬🇧 英語の本</span></label>
     </div>
     <p class="muted" id="recoNote"></p>
     <h3 class="reco-h">🙂 同じくらいのレベル</h3>
@@ -91,7 +91,7 @@
   </div>
   <div id="addSearchView">
     <div class="search-row">
-      <input id="searchInput" type="search" placeholder="タイトル・シリーズ名で検索（例：ORT, Frog）" autocomplete="off">
+      <input id="searchInput" type="search" placeholder="タイトル・シリーズ名で検索（例：ぐりとぐら, ORT）" autocomplete="off">
       <button id="scanBtn" class="btn" title="バーコードで読み取り">📷<span class="sm-hide"> バーコード</span></button>
     </div>
     <div id="searchResults" class="results"></div>
@@ -106,8 +106,8 @@
       </div>
     </div>
     <div class="seg" role="radiogroup">
-      <label><input type="radio" name="fLang" value="en" checked><span>🇬🇧 英語</span></label>
       <label><input type="radio" name="fLang" value="ja"><span>🇯🇵 日本語</span></label>
+      <label><input type="radio" name="fLang" value="en" checked><span>🇬🇧 英語</span></label>
     </div>
     <div id="enFields">
       <label>語数 <small class="muted" id="wordHint"></small><input id="fWords" type="number" inputmode="numeric" min="0" step="1"></label>

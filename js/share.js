@@ -14,7 +14,7 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 /**
- * @param {object} d { year, month, name, enWords, jaBooks, jaChars, totalEn, streak, days: Map(day->{en,jaBooks}) }
+ * @param {object} d { year, month, name, enWords, jaBooks, jaChars, totalEn, totalJa, streak, days: Map(day->{en,jaBooks}) }
  */
 export async function renderShareImage(canvas, d) {
   try { await document.fonts.load(`700 40px "M PLUS Rounded 1c"`); } catch { /* システムフォントで代用 */ }
@@ -34,32 +34,31 @@ export async function renderShareImage(canvas, d) {
   ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`;
   ctx.fillText(`📚 ${CONFIG.appName}`, W / 2, 110);
   ctx.fillStyle = C.ink; ctx.font = `800 64px ${FONT}`;
-  const head = `${d.year}年${d.month}月${d.name ? ' ' + d.name + 'の' : 'の'}多読`;
+  const head = `${d.year}年${d.month}月${d.name ? ' ' + d.name + 'の' : 'の'}読書きろく`;
   ctx.fillText(head, W / 2, 200);
 
-  // 英語カード
-  roundRect(ctx, 80, 250, W - 160, 300, 36); ctx.fillStyle = C.card; ctx.fill();
-  ctx.fillStyle = C.en; ctx.font = `700 40px ${FONT}`; ctx.fillText('English', W / 2, 320);
-  ctx.font = `800 132px ${FONT}`;
-  const numW = ctx.measureText(fmt(d.enWords)).width;
-  ctx.fillText(fmt(d.enWords), W / 2 - 30, 460);
-  ctx.textAlign = 'left'; ctx.font = `800 52px ${FONT}`;
-  ctx.fillText('語', W / 2 - 30 + numW / 2 + 12, 460);
-  ctx.textAlign = 'center'; ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`;
-  ctx.fillText(`累計 ${fmt(d.totalEn)} 語`, W / 2, 520);
-
-  // 日本語カード
-  roundRect(ctx, 80, 580, W - 160, 170, 36); ctx.fillStyle = C.card; ctx.fill();
-  ctx.fillStyle = C.ja; ctx.font = `700 40px ${FONT}`; ctx.fillText('にほんご', W / 2, 645);
-  ctx.font = `800 64px ${FONT}`;
-  ctx.fillText(`${fmt(d.jaBooks)}冊` + (d.jaChars ? `（約${fmt(d.jaChars)}字）` : ''), W / 2, 720);
+  // 日本語カード（左）と英語カード（右）
+  const cw = (W - 160 - 30) / 2;
+  const card = (x, color, label, num, unit, sub) => {
+    roundRect(ctx, x, 250, cw, 330, 36); ctx.fillStyle = C.card; ctx.fill();
+    const cx = x + cw / 2;
+    ctx.textAlign = 'center'; ctx.fillStyle = color; ctx.font = `700 38px ${FONT}`; ctx.fillText(label, cx, 315);
+    let size = 104; ctx.font = `800 ${size}px ${FONT}`;
+    while (ctx.measureText(num).width > cw - 110 && size > 56) { size -= 4; ctx.font = `800 ${size}px ${FONT}`; }
+    const nw = ctx.measureText(num).width;
+    ctx.fillText(num, cx - 22, 450);
+    ctx.textAlign = 'left'; ctx.font = `800 44px ${FONT}`; ctx.fillText(unit, cx - 22 + nw / 2 + 8, 450);
+    ctx.textAlign = 'center'; ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`; ctx.fillText(sub, cx, 525);
+  };
+  card(80, C.ja, 'にほんご', fmt(d.jaBooks), '冊', d.jaChars ? `約${fmt(d.jaChars)}字` : `累計 ${fmt(d.totalJa)}冊`);
+  card(80 + cw + 30, C.en, 'English', fmt(d.enWords), '語', `累計 ${fmt(d.totalEn)}語`);
 
   // ミニカレンダー（週の数に合わせて行の高さを調整）
   const first = new Date(d.year, d.month - 1, 1).getDay();
   const days = new Date(d.year, d.month, 0).getDate();
   const rows = Math.ceil((first + days) / 7);
-  const top = 790, cell = 120, left = (W - cell * 7) / 2, rowH = Math.min(76, 370 / rows);
-  roundRect(ctx, 80, top - 20, W - 160, 440, 36); ctx.fillStyle = C.card; ctx.fill();
+  const top = 650, cell = 120, left = (W - cell * 7) / 2, rowH = Math.min(84, 470 / rows);
+  roundRect(ctx, 80, top - 20, W - 160, 570, 36); ctx.fillStyle = C.card; ctx.fill();
   const maxEn = Math.max(1, ...[...d.days.values()].map((v) => v.en));
   ctx.font = `700 26px ${FONT}`;
   ['日', '月', '火', '水', '木', '金', '土'].forEach((w, i) => { ctx.fillStyle = C.sub; ctx.fillText(w, left + cell * i + cell / 2, top + 26); });
