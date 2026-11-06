@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS, JA_CHAR_PRESETS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
+import { searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -219,8 +219,15 @@ function coverImg(url, fallbackHtml, alt) {
 }
 window.coverNext = (img) => {
   const rest = (img.dataset.alt || '').split('|').filter(Boolean);
-  if (rest.length) { img.dataset.alt = rest.slice(1).join('|'); img.src = rest[0]; }
-  else img.outerHTML = img.dataset.ph;
+  if (!rest.length) { img.outerHTML = img.dataset.ph; return; }
+  img.dataset.alt = rest.slice(1).join('|');
+  if (rest[0].startsWith('search:')) {
+    // 最後の手段：Google Books で表紙を探す
+    searchCoverStrict(rest[0].slice(7)).then((url) => {
+      if (!img.isConnected) return;
+      if (url) img.src = url; else window.coverNext(img);
+    });
+  } else img.src = rest[0];
 };
 
 function estimateLevel(words) {

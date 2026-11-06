@@ -176,7 +176,7 @@ const EN = [
   ['Harry Potter and the Prisoner of Azkaban', 'J. K. Rowling', 'Harry Potter', 107000, 7.8],
 ];
 
-// [タイトル, 著者, シリーズ, 文字数(目安), 表紙用ISBN]
+// [タイトル, 著者, シリーズ, 文字数(目安), ISBN, 表紙だけ別の版を使う時のISBN]
 // 表紙用ISBN は Google Books で書名・著者を照合して確認したもの（シリーズは1巻目など）
 const JA = [
   ['もこ もこもこ', '谷川俊太郎', '', 50, '9784580811409'],
@@ -194,7 +194,7 @@ const JA = [
   ['はらぺこあおむし', 'エリック・カール', 'エリック・カール', 700, '9784033280103'],
   ['スイミー', 'レオ・レオニ', 'レオ・レオニ', 800, '9784769020011'],
   ['てぶくろ', 'ウクライナ民話', '', 1000],
-  ['100かいだてのいえ', 'いわいとしお', '100かいだてのいえ', 1000, '9784033317403'],
+  ['100かいだてのいえ', 'いわいとしお', '100かいだてのいえ', 1000, '9784033317403', '9784033327105'],
   ['ぐりとぐら', '中川李枝子', 'ぐりとぐら', 1600, '9784834000825'],
   ['11ぴきのねこ', '馬場のぼる', '11ぴきのねこ', 1500, '9784772100045'],
   ['バムとケロのにちようび', '島田ゆか', 'バムとケロ', 1500, '9784894235434'],
@@ -217,7 +217,11 @@ const JA = [
 let _id = 0;
 export const PRESET_BOOKS = [
   ...EN.map(([title, author, series, count, lv]) => ({ pid: 'p' + (++_id), lang: 'en', title, author, series, count, lv })),
-  ...JA.map(([title, author, series, count, coverIsbn]) => ({ pid: 'p' + (++_id), lang: 'ja', title, author, series, count, lv: null, coverIsbn: coverIsbn || '', isbn: /1冊/.test(title) ? '' : (coverIsbn || '') })),
+  ...JA.map(([title, author, series, count, isbn, coverOnly]) => ({
+    pid: 'p' + (++_id), lang: 'ja', title, author, series, count, lv: null,
+    coverIsbn: coverOnly || isbn || '',          // 表紙を探すISBN
+    isbn: /1冊/.test(title) ? '' : (isbn || ''), // 購入リンク用（シリーズ平均は検索リンク）
+  })),
 ];
 
 // 日本語の本の文字数の目安ボタン

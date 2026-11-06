@@ -104,7 +104,7 @@ const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 // 戻り値: URL文字列 / ''（表紙なし確定） / undefined（未取得）
 export function cachedCover(pid) {
   const b = PRESET_BOOKS.find((x) => x.pid === pid);
-  if (b?.coverIsbn) return isbnCoverList(b.coverIsbn);
+  if (b?.coverIsbn) return isbnCoverList(b.coverIsbn, b.pid);
   const v = coverCache[pid];
   if (v === undefined) return undefined;
   if (typeof v === 'string') return v;
@@ -157,17 +157,40 @@ function limited(fn) {
 
 // ISBN が分かっている本は通信なしで候補URLを並べる（読み込めなければ表示側で次の候補へ）
 //   版元ドットコム(openBD) → 国立国会図書館 → Google Books
-export function isbnCoverList(isbn) {
+//   最後の「search:」は、Google Books で表紙があると確認できたものだけを探す（ISBN → 書名の完全一致）
+export function isbnCoverList(isbn, pid) {
   if (!/^97[89]\d{10}$/.test(isbn || '')) return '';
   return [
     `https://cover.openbd.jp/${isbn}.jpg`,
     `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`,
-    `https://books.google.com/books/content?vid=ISBN${isbn}&printsec=frontcover&img=1&zoom=1`,
+    pid ? `search:${pid}` : `https://books.google.com/books/content?vid=ISBN${isbn}&printsec=frontcover&img=1&zoom=1`,
   ].join('|');
 }
 
+// Google Books で「本当に表紙画像がある」ものを探す（書名が完全一致するものだけ。別の版や似た本は使わない）
+const strictCache = new Map();
+export function searchCoverStrict(pid) {
+  if (strictCache.has(pid)) return strictCache.get(pid);
+  const book = PRESET_BOOKS.find((b) => b.pid === pid);
+  if (!book) return Promise.resolve('');
+  const title = (COVER_QUERY[book.series] && isGeneric(book.title)) ? COVER_QUERY[book.series][0] : book.title.replace(/[（(].*?[)）]/g, '').trim();
+  const author = book.author.split(/[\/,・]/)[0].trim();
+  const real = (b) => b.cover && !b.cover.includes('ndlsearch');
+  const p = (async () => {
+    if (book.coverIsbn) {
+      const hit = (await searchGoogleBooks(`isbn:${book.coverIsbn}`)).find(real);
+      if (hit) return hit.cover;
+    }
+    let list = await searchGoogleBooks(`intitle:${title}` + (author ? ` inauthor:${author}` : ''));
+    if (!list.some(real)) list = list.concat(await searchGoogleBooks(`intitle:${title}`));
+    return list.find((b) => real(b) && norm(b.title) === norm(title))?.cover || '';
+  })().catch(() => '');
+  strictCache.set(pid, p);
+  return p;
+}
+
 export function fetchPresetCover(book) {
-  if (book.coverIsbn) return Promise.resolve(isbnCoverList(book.coverIsbn));
+  if (book.coverIsbn) return Promise.resolve(isbnCoverList(book.coverIsbn, book.pid));
   const c = cachedCover(book.pid);
   if (c !== undefined) return Promise.resolve(c);
   let title, author;
