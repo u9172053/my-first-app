@@ -151,7 +151,9 @@ function renderReco() {
   const preset = (l) => PRESET_BOOKS.find((b) => b.pid === l.pid);
   const recentSeries = new Set(recent.map((l) => preset(l)?.series).filter(Boolean));
   const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
-  const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0);
+  // 表紙が出なかった本は順位を下げる（外しはしない）。表紙が出た本はわずかに優先
+  const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
+  const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b);
   const used = new Set();
   let same, up, note;
 
@@ -185,7 +187,8 @@ function renderReco() {
   [...same, ...up].forEach((b) => {
     if (cachedCover(b.pid) !== undefined) return;
     fetchPresetCover(b).then((url) => {
-      document.querySelectorAll(`.reco-img[data-pid="${b.pid}"]`).forEach((el) => { if (url) el.innerHTML = recoCover(url, b); });
+      if (!url) { markCover(b.pid, 0); return; }
+      document.querySelectorAll(`.reco-img[data-pid="${b.pid}"]`).forEach((el) => { el.innerHTML = recoCover(url, b); });
     });
   });
 }
@@ -207,19 +210,35 @@ function recoCard(b) {
 // おすすめ用の大きい表紙（画像がなければ本の形のカードにタイトルを表示）
 function recoCover(url, b) {
   const ph = `<span class="ph ${b.lang}"><span>${esc(b.series || b.title.replace(/[（(].*?[)）]/g, ''))}</span></span>`;
-  return url ? coverImg(url, ph, b.title) : ph;
+  if (!url && cachedCover(b.pid) === '') markCover(b.pid, 0);
+  return url ? coverImg(url, ph, b.title, b.pid) : ph;
 }
 
 // 表紙画像：url は「候補1|候補2|…」。読み込めない・極小（画像なしの代わり画像）なら次の候補へ
-function coverImg(url, fallbackHtml, alt) {
+function coverImg(url, fallbackHtml, alt, pid = '') {
   const [first, ...rest] = String(url).split('|');
   return `<img src="${esc(first)}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer"
-    data-alt="${esc(rest.join('|'))}" data-ph="${esc(fallbackHtml)}"
-    onerror="coverNext(this)" onload="if(this.naturalWidth<40||this.naturalHeight<40)coverNext(this)">`;
+    data-alt="${esc(rest.join('|'))}" data-ph="${esc(fallbackHtml)}" data-pid="${esc(pid)}"
+    onerror="coverNext(this)" onload="if(this.naturalWidth<40||this.naturalHeight<40)coverNext(this);else coverOk(this)">`;
 }
+
+// 表紙が出た本(1)・出なかった本(0)をこの端末に記録（おすすめで表紙のある本を優先するため）
+const COVER_STATUS_KEY = 'tadoku-cover-status';
+let coverStatus = {};
+try { coverStatus = JSON.parse(localStorage.getItem(COVER_STATUS_KEY) || '{}'); } catch { coverStatus = {}; }
+// 値：1＝表紙あり／それ以外の数字＝表紙が出なかった日時（7日たったら忘れて再挑戦）
+const coverMissed = (pid) => coverStatus[pid] > 1 && Date.now() - coverStatus[pid] < 7 * 24 * 3600 * 1000;
+function markCover(pid, ok) {
+  if (!pid) return;
+  if (ok && coverStatus[pid] === 1) return;
+  if (!ok && coverMissed(pid)) return;
+  coverStatus[pid] = ok ? 1 : Date.now();
+  try { localStorage.setItem(COVER_STATUS_KEY, JSON.stringify(coverStatus)); } catch { /* 保存できなくても表示は続ける */ }
+}
+window.coverOk = (img) => markCover(img.dataset.pid, 1);
 window.coverNext = (img) => {
   const rest = (img.dataset.alt || '').split('|').filter(Boolean);
-  if (!rest.length) { img.outerHTML = img.dataset.ph; return; }
+  if (!rest.length) { markCover(img.dataset.pid, 0); img.outerHTML = img.dataset.ph; return; }
   img.dataset.alt = rest.slice(1).join('|');
   if (rest[0].startsWith('search:')) {
     // 最後の手段：Google Books で表紙を探す
