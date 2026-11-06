@@ -133,9 +133,16 @@ function renderCalendar() {
 // 日本語：最近読んだ日本語の本の文字数から「同じくらい」4冊＋「少し長め」4冊
 let recoLang = 'ja';
 
+// 同じくらいの点数の本は日替わりで入れ替える（いつも同じ本ばかりにならないように）
+function dailyJitter(pid) {
+  let h = 0;
+  for (const c of pid + todayStr()) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return (h % 1000) / 1000 * 0.4;
+}
+
 function pickBooks(cands, scoreFn, n, used) {
   const out = [];
-  for (const { b, s } of cands.map((b) => ({ b, s: scoreFn(b) })).filter((x) => x.s != null).sort((x, y) => x.s - y.s)) {
+  for (const { b, s } of cands.map((b) => ({ b, s: scoreFn(b) })).filter((x) => x.s != null).map((x) => ({ ...x, s: x.s + dailyJitter(x.b.pid) })).sort((x, y) => x.s - y.s)) {
     const key = b.series || b.pid;
     if (used.has(key) || used.has(b.pid)) continue;
     used.add(key); used.add(b.pid); out.push(b);
@@ -170,16 +177,16 @@ function renderReco() {
     note = avg == null ? 'まだ英語の記録がないので、はじめての1冊におすすめの本を選びました。'
       : `最近読んでいる英語の本は「${enAge(avg)}」くらい。それをもとに選びました。`;
   } else {
-    const chars = recent.map((l) => l.count || preset(l)?.count).filter((v) => v > 0);
-    const avg = chars.length ? chars.reduce((s, v) => s + v, 0) / chars.length : null;
-    const base = avg ?? 300;
-    const dist = (b, target) => Math.abs(Math.log(b.count / target));
-    same = pickBooks(cands, (b) => (b.count >= base / 2.5 && b.count <= base * 2 ? dist(b, base) + bonus(b) : null), 4, used);
-    up = pickBooks(cands, (b) => (b.count > base * 1.5 && b.count <= base * 8 ? dist(b, base * 3) + bonus(b) : null), 4, used);
-    if (same.length < 4) same.push(...pickBooks(cands, (b) => dist(b, base), 4 - same.length, used));
-    if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.count > base ? dist(b, base * 3) : null), 4 - up.length, used));
+    // 日本語は対象年齢の目安で選ぶ（リストにない本は、入力された文字数からおおよその年齢を推定）
+    const ages = recent.map((l) => preset(l)?.age ?? charsToAge(l.count)).filter((v) => v != null);
+    const avg = ages.length ? ages.reduce((s, v) => s + v, 0) / ages.length : null;
+    const base = avg ?? 1;
+    same = pickBooks(cands, (b) => (Math.abs(b.age - base) <= 0.75 ? Math.abs(b.age - base) + bonus(b) : null), 4, used);
+    up = pickBooks(cands, (b) => (b.age > base + 0.5 && b.age <= base + 2.5 ? Math.abs(b.age - (base + 1.5)) + bonus(b) : null), 4, used);
+    if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.age - base), 4 - same.length, used));
+    if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.age > base ? b.age - base : null), 4 - up.length, used));
     note = avg == null ? 'まだ日本語の記録がないので、小さい子に人気の絵本を選びました。'
-      : `最近読んでいる日本語の本は「${jaAge(avg)}」くらい（約${fmt(avg)}字）。それをもとに選びました。`;
+      : `最近読んでいる日本語の本は「${jaAge(Math.round(avg))}」くらい。それをもとに選びました。`;
   }
 
   $('#recoNote').textContent = note;
@@ -200,7 +207,7 @@ function recoCard(b) {
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
-      <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.count)}</div>
+      <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.age) + '（目安）'}</div>
       <div class="why">約${fmt(b.count)}${unit}・${esc(b.series || b.author)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
@@ -256,9 +263,17 @@ function enAge(lv) {
   const t = [[0.5, '1〜3歳'], [1.0, '3〜5歳'], [1.6, '4〜6歳'], [2.4, '5〜7歳'], [3.5, '6〜8歳'], [5.0, '8〜10歳'], [6.5, '9〜12歳']];
   return '英語圏の' + ((t.find(([max]) => lv <= max) || [0, '10歳〜'])[1]) + '向け';
 }
-function jaAge(chars) {
-  const t = [[200, '0〜2歳'], [700, '1〜3歳'], [2000, '3〜5歳'], [5000, '4〜6歳'], [15000, '5〜7歳'], [50000, '小学校中学年']];
-  return ((t.find(([max]) => chars <= max) || [0, '小学校高学年'])[1]) + '向け';
+// 対象年齢の目安（0〜6＝○歳ごろから、7＝小学校低学年、8＝中学年、9＝高学年）
+function jaAge(age) {
+  if (age == null) return '';
+  if (age <= 6) return `${age}歳ごろから`;
+  return ['小学校低学年から', '小学校中学年から', '小学校高学年から'][Math.min(age, 9) - 7];
+}
+// リストにない日本語の本：入力された文字数から年齢をざっくり推定（おすすめ選びにだけ使う）
+function charsToAge(chars) {
+  if (!chars) return null;
+  const t = [[200, 0], [700, 1], [2000, 3], [5000, 4], [15000, 5], [50000, 7]];
+  return (t.find(([max]) => chars <= max) || [0, 8])[1];
 }
 
 function estimateLevel(words) {
@@ -366,7 +381,7 @@ function itemHtml(b) {
   const n = b.count ? (b.lang === 'en' ? `${approx}${fmt(b.count)}語` : `${approx}${fmt(b.count)}字`) : (b.lang === 'en' ? '語数？' : '');
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
-    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}</div></div>
+    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}</div></div>
     <div class="n ${b.lang}">${n}</div></button>`;
 }
 
