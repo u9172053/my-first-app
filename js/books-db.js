@@ -201,12 +201,17 @@ export const PRESET_BOOKS = [
     pid: 'e' + isbn, lang: 'en', title, author, series, count, lv, isbn, olCover, rl,
   })),
   // 日本語の本の count は推定文字数（約）。おすすめは対象年齢で選ぶ
-  ...JA_BOOKS.map(([title, author, series, age, isbn, chars, coverOnly]) => ({
+  ...JA_BOOKS.map(([title, author, series, age, isbn, c5, c6]) => {
+    // 6列目は推定文字数（数値）。古い形式では表紙用ISBN（文字列）が入っていたので両方に対応
+    const chars = typeof c5 === 'number' ? c5 : 0;
+    const coverOnly = typeof c5 === 'string' ? c5 : c6;
+    return {
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
     coverIsbn: coverOnly || isbn || '', // 表紙を探すISBN
     isbn: isbn || '',                   // 購入リンク用
-  })),
+    };
+  }),
 ];
 
 // 日本語の本の文字数の目安ボタン
