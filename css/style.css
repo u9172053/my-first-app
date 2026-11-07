@@ -193,6 +193,9 @@ label input { margin-top: 3px; color: var(--ink); font-weight: 400; font-size: 1
 .reco .age { align-self: flex-start; font-size: 11px; font-weight: 800; border-radius: 999px; padding: 0 8px; }
 .reco .age.ja { background: var(--ja-soft); color: var(--ja); }
 .reco .age.en { background: var(--en-soft); color: var(--en); }
+.reco .cnt { font-weight: 800; }
+.reco .cnt.en { color: var(--en); }
+.reco .cnt.ja { color: var(--ja); }
 .reco .why { font-size: 11px; color: var(--sub); }
 .reco .links { display: flex; gap: 6px; margin-top: auto; padding-top: 4px; }
 .reco .links .btn { flex: 1; }

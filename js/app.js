@@ -216,7 +216,7 @@ function recoCard(b) {
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
       <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.age) + '（目安）'}</div>
-      <div class="why">${esc(b.author || b.series)}</div>
+      <div class="why">${b.count ? `<b class="cnt ${b.lang}">${b.exact ? '' : '約'}${fmt(b.count)}${b.lang === 'en' ? '語' : '字'}</b>・` : ''}${esc(b.author || b.series)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>
