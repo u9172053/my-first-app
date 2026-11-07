@@ -162,7 +162,7 @@ function renderReco() {
   // 表紙が出なかった本は順位を下げる（外しはしない）。表紙が出た本はわずかに優先
   const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
   const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
-    + (b.lang === 'ja' && !b.classic ? 0.3 : 0); // 日本語は定番の本を優先
+    + (b.classic ? 0 : Math.max(0, 0.3 - Math.log10((b.rl || 0) + 1) / 10)); // 定番・人気の本を優先
   const used = new Set();
   let same, up, note;
 
@@ -209,7 +209,7 @@ function recoCard(b) {
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
       <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.age) + '（目安）'}</div>
-      <div class="why">約${fmt(b.count)}${unit}・${esc(b.series || b.author)}</div>
+      <div class="why">${b.count ? (b.exact ? '' : '約') + fmt(b.count) + unit + '・' : ''}${esc(b.series || b.author)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>

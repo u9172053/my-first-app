@@ -23,7 +23,8 @@ export function searchPresets(q, limit = 20) {
     else if (t.includes(n)) score = 2;
     else if (s.includes(n)) score = 1.5;
     else if (a.includes(n)) score = 1;
-    if (score >= 0) scored.push([score + (b.classic ? 0.5 : 0), b]);
+    // 定番の本と、読んだ人が多い本を上に
+    if (score >= 0) scored.push([score + (b.classic ? 0.5 : 0) + Math.min(0.4, Math.log10((b.rl || 0) + 1) / 10), b]);
   }
   return scored.sort((x, y) => y[0] - x[0]).slice(0, limit).map((x) => x[1]);
 }
@@ -104,8 +105,11 @@ const inflight = new Map();
 const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 
 // 戻り値: URL文字列 / ''（表紙なし確定） / undefined（未取得）
+const olCoverUrl = (id) => `https://covers.openlibrary.org/b/id/${id}-M.jpg`;
+
 export function cachedCover(pid) {
   const b = PRESET_BOOKS.find((x) => x.pid === pid);
+  if (b?.olCover) return olCoverUrl(b.olCover) + (b.isbn ? `|search:${b.pid}` : '');
   if (b?.coverIsbn) return isbnCoverList(b.coverIsbn, b.pid);
   const v = coverCache[pid];
   if (v === undefined) return undefined;
@@ -192,6 +196,7 @@ export function searchCoverStrict(pid) {
 }
 
 export function fetchPresetCover(book) {
+  if (book.olCover) return Promise.resolve(olCoverUrl(book.olCover) + (book.isbn ? `|search:${book.pid}` : ''));
   if (book.coverIsbn) return Promise.resolve(isbnCoverList(book.coverIsbn, book.pid));
   const c = cachedCover(book.pid);
   if (c !== undefined) return Promise.resolve(c);

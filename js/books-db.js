@@ -1,4 +1,5 @@
 import { JA_BOOKS, JA_CLASSICS } from './books-ja.js';
+import { EN_EXACT, EN_EXTRA } from './books-en.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -180,8 +181,25 @@ const EN = [
 
 
 let _id = 0;
+const normTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+const EXACT_BY_TITLE = new Map(EN_EXACT.map((r) => [normTitle(r[0]), r]));
+const EN_TITLES = new Set(EN.map((r) => normTitle(r[0])));
 export const PRESET_BOOKS = [
-  ...EN.map(([title, author, series, count, lv]) => ({ pid: 'p' + (++_id), lang: 'en', title, author, series, count, lv })),
+  // 定番（手で選んだ本）。全文から数えた語数がある本はそちらを使う
+  ...EN.map(([title, author, series, count, lv]) => {
+    const ex = EXACT_BY_TITLE.get(normTitle(title));
+    return ex
+      ? { pid: 'p' + (++_id), lang: 'en', title, author, series, count: ex[2], lv, exact: true, isbn: ex[4], olCover: ex[5], classic: true }
+      : { pid: 'p' + (++_id), lang: 'en', title, author, series, count, lv, classic: true };
+  }),
+  // 名作（Project Gutenberg の全文から数えた実際の語数）
+  ...EN_EXACT.filter((r) => !EN_TITLES.has(normTitle(r[0]))).map(([title, author, count, lv, isbn, olCover, pg, rl]) => ({
+    pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true,
+  })),
+  // 定番作家の作品（語数は推定）
+  ...EN_EXTRA.map(([title, author, series, count, lv, isbn, olCover, rl]) => ({
+    pid: 'e' + isbn, lang: 'en', title, author, series, count, lv, isbn, olCover, rl,
+  })),
   // 日本語の本は文字数のデータがないので count=0（記録時に任意で入力）。おすすめは対象年齢で選ぶ
   ...JA_BOOKS.map(([title, author, series, age, isbn, coverOnly]) => ({
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: 0, lv: null, age,
