@@ -165,7 +165,8 @@ function renderReco() {
   const recent = logs.filter((l) => l.lang === recoLang).slice(0, 15);
   const preset = (l) => PRESET_BOOKS.find((b) => b.pid === l.pid);
   const recentSeries = new Set(recent.map((l) => preset(l)?.series).filter(Boolean));
-  const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
+  // おすすめには、文字数・語数の根拠がある本（実際のページ数や全文から計算できた本）だけを出す
+  const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && b.reliable && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
   // 表紙が出なかった本は順位を下げる（外しはしない）。表紙が出た本はわずかに優先
   const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
   const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
@@ -216,7 +217,7 @@ function recoCard(b) {
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
       <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.age) + '（目安）'}</div>
-      <div class="why">${b.count ? (b.exact ? '' : '約') + fmt(b.count) + unit + '・' : ''}${esc(b.series || b.author)}</div>
+      <div class="why">${esc(b.author || b.series)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>

@@ -1,5 +1,5 @@
-import { JA_BOOKS, JA_CLASSICS } from './books-ja.js';
-import { EN_EXACT, EN_EXTRA } from './books-en.js';
+import { JA_BOOKS, JA_CLASSICS, JA_PAGE_KNOWN } from './books-ja.js';
+import { EN_EXACT, EN_EXTRA, EN_PAGE_KNOWN } from './books-en.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -189,16 +189,17 @@ export const PRESET_BOOKS = [
   ...EN.map(([title, author, series, count, lv]) => {
     const ex = EXACT_BY_TITLE.get(normTitle(title));
     return ex
-      ? { pid: 'p' + (++_id), lang: 'en', title, author, series, count: ex[2], lv, exact: true, isbn: ex[4], olCover: ex[5], classic: true }
-      : { pid: 'p' + (++_id), lang: 'en', title, author, series, count, lv, classic: true };
+      ? { pid: 'p' + (++_id), lang: 'en', title, author, series, count: ex[2], lv, exact: true, isbn: ex[4], olCover: ex[5], classic: true, reliable: true }
+      : { pid: 'p' + (++_id), lang: 'en', title, author, series, count, lv, classic: true, reliable: true };
   }),
   // 名作（Project Gutenberg の全文から数えた実際の語数）
   ...EN_EXACT.filter((r) => !EN_TITLES.has(normTitle(r[0]))).map(([title, author, count, lv, isbn, olCover, pg, rl]) => ({
-    pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true,
+    pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true, reliable: true,
   })),
   // 定番作家の作品（語数は推定）
   ...EN_EXTRA.map(([title, author, series, count, lv, isbn, olCover, rl]) => ({
     pid: 'e' + isbn, lang: 'en', title, author, series, count, lv, isbn, olCover, rl,
+    reliable: EN_PAGE_KNOWN.has(isbn), // 実際のページ数から語数を出せた本
   })),
   // 日本語の本の count は推定文字数（約）。おすすめは対象年齢で選ぶ
   ...JA_BOOKS.map(([title, author, series, age, isbn, c5, c6]) => {
@@ -208,6 +209,7 @@ export const PRESET_BOOKS = [
     return {
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
+    reliable: JA_PAGE_KNOWN.has(isbn),  // 実際のページ数から文字数を出せた本
     coverIsbn: coverOnly || isbn || '', // 表紙を探すISBN
     isbn: isbn || '',                   // 購入リンク用
     };
