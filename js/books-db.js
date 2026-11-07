@@ -200,9 +200,9 @@ export const PRESET_BOOKS = [
   ...EN_EXTRA.map(([title, author, series, count, lv, isbn, olCover, rl]) => ({
     pid: 'e' + isbn, lang: 'en', title, author, series, count, lv, isbn, olCover, rl,
   })),
-  // 日本語の本は文字数のデータがないので count=0（記録時に任意で入力）。おすすめは対象年齢で選ぶ
-  ...JA_BOOKS.map(([title, author, series, age, isbn, coverOnly]) => ({
-    pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: 0, lv: null, age,
+  // 日本語の本の count は推定文字数（約）。おすすめは対象年齢で選ぶ
+  ...JA_BOOKS.map(([title, author, series, age, isbn, chars, coverOnly]) => ({
+    pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
     coverIsbn: coverOnly || isbn || '', // 表紙を探すISBN
     isbn: isbn || '',                   // 購入リンク用

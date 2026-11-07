@@ -59,8 +59,7 @@ h1, h2, h3, h4 { margin: 0; line-height: 1.3; }
 .stat.en .val { color: var(--en); }
 .stat.ja .val { color: var(--ja); }
 .stat.wide { grid-column: 1 / -1; }
-.stat.streak { display: flex; align-items: baseline; gap: 12px; padding: 8px 14px; }
-.stat.streak .val { font-size: 20px; }
+.stat .books { font-size: 14px; font-weight: 800; color: var(--ink); margin-top: 2px; }
 
 /* cards */
 .card { background: var(--card); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); margin-bottom: 14px; }

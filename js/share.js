@@ -78,7 +78,7 @@ export async function renderShareImage(canvas, d) {
   }
 
   ctx.fillStyle = C.accent; ctx.font = `800 40px ${FONT}`;
-  ctx.fillText(d.streak > 1 ? `🔥 ${d.streak}日れんぞく！` : '📖 コツコツ続けよう！', W / 2, 1270);
+  ctx.fillText(d.readDays ? `📖 ${d.month}月は ${d.readDays}日 読んだよ！` : '📖 コツコツ続けよう！', W / 2, 1270);
   ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`;
   ctx.fillText(CONFIG.hashtags.map((h) => '#' + h).join('  '), W / 2, 1320);
 }

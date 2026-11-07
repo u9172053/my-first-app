@@ -43,12 +43,16 @@ const activeChild = () => {
 };
 const logsFor = (cid = activeChild()) => state.logs.filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
 
+// 文字数・語数が0で記録された本は、リストにある推定値で補う（以前の記録も集計に入るように）
+const PRESET_COUNT = new Map(PRESET_BOOKS.map((b) => [b.pid, b.count]));
+const countOf = (l) => l.count || (l.pid && PRESET_COUNT.get(l.pid)) || 0;
+
 function aggregate(logs) {
   const r = { en: 0, jaBooks: 0, jaChars: 0, enBooks: 0 };
   for (const l of logs) {
     const t = l.times || 1;
-    if (l.lang === 'en') { r.en += (l.count || 0) * t; r.enBooks += t; }
-    else { r.jaBooks += t; r.jaChars += (l.count || 0) * t; }
+    if (l.lang === 'en') { r.en += countOf(l) * t; r.enBooks += t; }
+    else { r.jaBooks += t; r.jaChars += countOf(l) * t; }
   }
   return r;
 }
@@ -93,13 +97,16 @@ function renderStats() {
   const mPrefix = `${viewY}-${pad(viewM + 1)}`;
   const month = aggregate(logs.filter((l) => l.date.startsWith(mPrefix)));
   const all = aggregate(logs);
-  const st = streak(logs);
-  $('#stats').innerHTML = `
-    <div class="stat ja"><div class="lbl">${viewM + 1}月の日本語</div><div class="val">${fmt(month.jaBooks)}<small>冊</small></div><div class="muted small">${month.jaChars ? '約' + fmt(month.jaChars) + '字' : '&nbsp;'}</div></div>
-    <div class="stat en"><div class="lbl">${viewM + 1}月の英語</div><div class="val">${fmt(month.en)}<small>語</small></div><div class="muted small">${month.enBooks ? fmt(month.enBooks) + '冊' : '&nbsp;'}</div></div>
-    <div class="stat"><div class="lbl">日本語の累計</div><div class="val">${fmt(all.jaBooks)}<small>冊</small></div></div>
-    <div class="stat"><div class="lbl">英語の累計</div><div class="val">${fmt(all.en)}<small>語</small></div></div>
-    <div class="stat wide streak"><div class="lbl">連続記録</div><div class="val">${st}<small>日</small> ${st >= 3 ? '🔥' : ''}</div></div>`;
+  // 日本語は文字数と冊数、英語は語数と冊数を並べて表示
+  const card = (cls, label, count, unit, books) => `
+    <div class="stat ${cls}"><div class="lbl">${label}</div>
+      <div class="val">${fmt(count)}<small>${unit}</small></div>
+      <div class="books">${fmt(books)}冊</div></div>`;
+  $('#stats').innerHTML =
+    card('ja', `${viewM + 1}月の日本語`, month.jaChars, '字', month.jaBooks) +
+    card('en', `${viewM + 1}月の英語`, month.en, '語', month.enBooks) +
+    card('ja', '日本語の累計', all.jaChars, '字', all.jaBooks) +
+    card('en', '英語の累計', all.en, '語', all.enBooks);
 }
 
 const shortNum = (n) => n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '万' : fmt(n);
@@ -312,7 +319,8 @@ function renderDay() {
   $('#dayList').innerHTML = logs.map((l) => {
     const c = multi ? children().find((x) => x.id === l.childId) : null;
     const t = l.times || 1;
-    const n = l.lang === 'en' ? `${fmt(l.count * t)}語` : `${t}冊${l.count ? '・約' + fmt(l.count * t) + '字' : ''}`;
+    const cnt = countOf(l);
+    const n = l.lang === 'en' ? `${fmt(cnt * t)}語` : `${t}冊${cnt ? '・約' + fmt(cnt * t) + '字' : ''}`;
     return `<button class="item" data-log="${l.id}">
       <div class="cover">${coverInner(l.cover, l.lang)}</div>
       <div class="grow"><div class="t"><span class="tag ${l.lang}">${l.lang === 'en' ? '英' : '日'}</span>${esc(l.title)}</div>
@@ -523,7 +531,7 @@ function shareData() {
   for (const [date, ls] of byDay(mLogs)) days.set(+date.slice(8), aggregate(ls));
   const a = activeChild();
   const name = $('#shareName').checked && a !== 'all' ? children().find((c) => c.id === a)?.name : '';
-  return { year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, streak: streak(logs), days };
+  return { year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days };
 }
 async function drawShare() {
   const d = shareData();
