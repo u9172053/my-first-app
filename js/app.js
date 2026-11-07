@@ -161,7 +161,8 @@ function renderReco() {
   const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
   // 表紙が出なかった本は順位を下げる（外しはしない）。表紙が出た本はわずかに優先
   const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
-  const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b);
+  const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
+    + (b.lang === 'ja' && !b.classic ? 0.3 : 0); // 日本語は定番の本を優先
   const used = new Set();
   let same, up, note;
 

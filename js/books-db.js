@@ -1,4 +1,4 @@
-import { JA_BOOKS } from './books-ja.js';
+import { JA_BOOKS, JA_CLASSICS } from './books-ja.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -185,6 +185,7 @@ export const PRESET_BOOKS = [
   // 日本語の本は文字数のデータがないので count=0（記録時に任意で入力）。おすすめは対象年齢で選ぶ
   ...JA_BOOKS.map(([title, author, series, age, isbn, coverOnly]) => ({
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: 0, lv: null, age,
+    classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
     coverIsbn: coverOnly || isbn || '', // 表紙を探すISBN
     isbn: isbn || '',                   // 購入リンク用
   })),

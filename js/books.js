@@ -15,13 +15,15 @@ export function searchPresets(q, limit = 20) {
   if (!n) return [];
   const scored = [];
   for (const b of PRESET_BOOKS) {
-    const t = norm(b.title), a = norm(b.author), s = norm(b.series);
+    // 正規化した文字列は初回だけ作って使い回す（1000冊以上あるので）
+    b._n ??= [norm(b.title), norm(b.author), norm(b.series)];
+    const [t, a, s] = b._n;
     let score = -1;
     if (t.startsWith(n)) score = 3;
     else if (t.includes(n)) score = 2;
     else if (s.includes(n)) score = 1.5;
     else if (a.includes(n)) score = 1;
-    if (score >= 0) scored.push([score, b]);
+    if (score >= 0) scored.push([score + (b.classic ? 0.5 : 0), b]);
   }
   return scored.sort((x, y) => y[0] - x[0]).slice(0, limit).map((x) => x[1]);
 }
