@@ -211,7 +211,6 @@ function renderReco() {
 }
 
 function recoCard(b) {
-  const unit = b.lang === 'en' ? '語' : '字';
   return `
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
