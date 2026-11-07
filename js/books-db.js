@@ -1,4 +1,4 @@
-import { JA_BOOKS, JA_CLASSICS, JA_PAGE_KNOWN } from './books-ja.js';
+import { JA_BOOKS, JA_CLASSICS, JA_PAGE_KNOWN, JA_EXACT } from './books-ja.js';
 import { EN_EXACT, EN_EXTRA, EN_PAGE_KNOWN } from './books-en.js';
 
 // ============================================================
@@ -181,6 +181,18 @@ const EN = [
 
 
 let _id = 0;
+// 青空文庫の作品と、リストの本（同じ作者の同じ作品）を対応づける
+const jaNorm = (s) => (s || '').normalize('NFKC').replace(/[\s・、。！？!?（）()]/g, '').replace(/狐/g, 'ぎつね');
+const JA_MATCHED = new Set();
+function jaExactFor(title, author) {
+  const t = jaNorm(title);
+  const ex = JA_EXACT.find((r) => {
+    const sur = r[1].replace(/（.*$/, '').slice(0, 2);
+    return (jaNorm(r[0]) === t || (r[2] && jaNorm(r[2]) === t)) && (author || '').includes(sur);
+  });
+  if (ex) JA_MATCHED.add(ex[5]);
+  return ex;
+}
 const normTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
 const EXACT_BY_TITLE = new Map(EN_EXACT.map((r) => [normTitle(r[0]), r]));
 const EN_TITLES = new Set(EN.map((r) => normTitle(r[0])));
@@ -204,16 +216,25 @@ export const PRESET_BOOKS = [
   // 日本語の本の count は推定文字数（約）。おすすめは対象年齢で選ぶ
   ...JA_BOOKS.map(([title, author, series, age, isbn, c5, c6]) => {
     // 6列目は推定文字数（数値）。古い形式では表紙用ISBN（文字列）が入っていたので両方に対応
-    const chars = typeof c5 === 'number' ? c5 : 0;
+    let chars = typeof c5 === 'number' ? c5 : 0;
     const coverOnly = typeof c5 === 'string' ? c5 : c6;
+    // 同じ作者の同じ作品が青空文庫にあれば、全文から数えた文字数を使う
+    const ex = jaExactFor(title, author);
+    if (ex) chars = ex[4];
     return {
+      exact: !!ex,
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
-    reliable: JA_PAGE_KNOWN.has(isbn),  // 実際のページ数から文字数を出せた本
+    reliable: JA_PAGE_KNOWN.has(isbn) || !!ex, // 実際のページ数・全文から文字数を出せた本
     coverIsbn: coverOnly || isbn || '', // 表紙を探すISBN
     isbn: isbn || '',                   // 購入リンク用
     };
   }),
+  // 青空文庫の名作（全文から数えた実際の文字数）。リストに同じ作者の同じ作品があるものは上で反映済み
+  ...JA_EXACT.filter((r) => !JA_MATCHED.has(r[5])).map(([title, author, alias, age, chars, id]) => ({
+    pid: 'a' + id, lang: 'ja', title, author, series: alias || author, count: chars, lv: null, age,
+    exact: true, reliable: true, classic: true, coverIsbn: '', isbn: '',
+  })),
 ];
 
 // 日本語の本の文字数の目安ボタン
