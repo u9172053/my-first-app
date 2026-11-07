@@ -49,6 +49,20 @@
     <div class="month-sum" id="monthSum"></div>
   </section>
 
+  <section class="card chart-card">
+    <div class="sec-head"><h2>📈 英語の語数</h2></div>
+    <div class="seg chart-tabs" id="chartTabs" role="radiogroup" aria-label="グラフの単位">
+      <label><input type="radio" name="chartMode" value="month" checked><span>月ごと（12か月）</span></label>
+      <label><input type="radio" name="chartMode" value="day"><span>日ごと（この月）</span></label>
+    </div>
+    <p class="chart-sum" id="chartSum"></p>
+    <div class="chart-wrap" id="chartWrap">
+      <svg id="enChart" role="img"></svg>
+      <div class="chart-tip" id="chartTip" hidden></div>
+    </div>
+    <details class="chart-table"><summary>表で見る</summary><div id="chartTable"></div></details>
+  </section>
+
   <button id="addBtn" class="fab">＋ 読んだ本を記録</button>
 
   <section class="card">
@@ -113,8 +127,7 @@
       <label>語数 <small class="muted" id="wordHint"></small><input id="fWords" type="number" inputmode="numeric" min="0" step="1"></label>
     </div>
     <div id="jaFields" hidden>
-      <label>文字数（目安・わからなければ下から選択）<input id="fChars" type="number" inputmode="numeric" min="0" step="1"></label>
-      <div id="charPresets" class="chips"></div>
+      <label>文字数（わかる場合だけ入力）<input id="fChars" type="number" inputmode="numeric" min="0" step="1"></label>
     </div>
     <div class="row2">
       <label>日付<input id="fDate" type="date" required></label>

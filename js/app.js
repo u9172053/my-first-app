@@ -1,5 +1,5 @@
 import { CONFIG } from './config.js';
-import { PRESET_BOOKS, JA_CHAR_PRESETS } from './books-db.js';
+import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
 import { searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
@@ -80,6 +80,7 @@ function render() {
   renderTabs();
   renderStats();
   renderCalendar();
+  renderChart();
   renderReco();
 }
 
@@ -102,10 +103,15 @@ function renderStats() {
     <div class="stat ${cls}"><div class="lbl">${label}</div>
       <div class="val">${fmt(count)}<small>${unit}</small></div>
       <div class="books">${fmt(books)}冊</div></div>`;
+  // 日本語は冊数が主役（文字数は実際に数えた本・自分で入力した本の分だけ添える）
+  const jaCard = (label, books, chars) => `
+    <div class="stat ja"><div class="lbl">${label}</div>
+      <div class="val">${fmt(books)}<small>冊</small></div>
+      <div class="books">${chars ? fmt(chars) + '字' : '&nbsp;'}</div></div>`;
   $('#stats').innerHTML =
-    card('ja', `${viewM + 1}月の日本語`, month.jaChars, '字', month.jaBooks) +
+    jaCard(`${viewM + 1}月の日本語`, month.jaBooks, month.jaChars) +
     card('en', `${viewM + 1}月の英語`, month.en, '語', month.enBooks) +
-    card('ja', '日本語の累計', all.jaChars, '字', all.jaBooks) +
+    jaCard('日本語の累計', all.jaBooks, all.jaChars) +
     card('en', '英語の累計', all.en, '語', all.enBooks);
 }
 
@@ -133,6 +139,82 @@ function renderCalendar() {
   const m = aggregate(logsFor().filter((l) => l.date.startsWith(`${viewY}-${pad(viewM + 1)}`)));
   const readDays = [...map.keys()].filter((k) => k.startsWith(`${viewY}-${pad(viewM + 1)}`)).length;
   $('#monthSum').innerHTML = `<span class="ja">日本語 ${fmt(m.jaBooks)}冊</span><span class="en">英語 ${fmt(m.en)}語（${fmt(m.enBooks)}冊）</span><span>📅 ${readDays}日読んだ</span>`;
+}
+
+// ---------------- 英語の語数グラフ（棒グラフ） ----------------
+let chartMode = 'month';
+const niceMax = (v) => {
+  if (v <= 0) return 100;
+  const p = 10 ** Math.floor(Math.log10(v)), n = v / p;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+};
+const axisNum = (v) => (v >= 10000 ? `${+(v / 10000).toFixed(1)}万` : fmt(v));
+
+function chartData() {
+  const logs = logsFor().filter((l) => l.lang === 'en');
+  if (chartMode === 'day') {
+    const days = new Date(viewY, viewM + 1, 0).getDate();
+    const prefix = `${viewY}-${pad(viewM + 1)}-`;
+    const sums = Array(days).fill(0);
+    for (const l of logs) if (l.date.startsWith(prefix)) sums[+l.date.slice(8) - 1] += countOf(l) * (l.times || 1);
+    return sums.map((v, i) => ({ label: `${i + 1}`, full: `${viewM + 1}月${i + 1}日`, v, tick: i === 0 || (i + 1) % 5 === 0 }));
+  }
+  const out = [];
+  for (let k = 11; k >= 0; k--) {
+    const d = new Date(viewY, viewM - k, 1);
+    const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    const v = logs.filter((l) => l.date.startsWith(prefix)).reduce((s, l) => s + countOf(l) * (l.times || 1), 0);
+    out.push({ label: `${d.getMonth() + 1}月`, full: `${d.getFullYear()}年${d.getMonth() + 1}月`, v, tick: true });
+  }
+  return out;
+}
+
+function renderChart() {
+  const data = chartData();
+  const W = 340, H = 170, L = 34, R = 6, T = 14, B = 22;
+  const max = niceMax(Math.max(...data.map((d) => d.v)));
+  const slot = (W - L - R) / data.length;
+  const bw = Math.min(24, slot * 0.7);
+  const y = (v) => T + (H - T - B) * (1 - v / max);
+  const ticks = [0, max / 2, max];
+  const total = data.reduce((s, d) => s + d.v, 0);
+  // いちばん多い棒にだけ数値を出す（全部の棒に数字は付けない）
+  const peak = data.reduce((m, d, i) => (d.v > (data[m]?.v || 0) ? i : m), -1);
+  let svg = ticks.map((t) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${axisNum(t)}</text>`).join('');
+  data.forEach((d, i) => {
+    const cx = L + slot * i + slot / 2;
+    if (d.v > 0) {
+      const top = y(d.v), h = H - B - top, r = Math.min(4, h, bw / 2), x = cx - bw / 2;
+      // 先端だけ角丸、根元は四角
+      svg += `<path class="bar" d="M${x},${H - B} V${top + r} Q${x},${top} ${x + r},${top} H${x + bw - r} Q${x + bw},${top} ${x + bw},${top + r} V${H - B} Z"/>`;
+      if (i === peak) svg += `<text class="val" x="${cx}" y="${top - 4}" text-anchor="middle">${axisNum(d.v)}</text>`;
+    }
+    if (d.tick) svg += `<text class="axis" x="${cx}" y="${H - 6}" text-anchor="middle">${d.label}</text>`;
+    svg += `<rect class="hit" data-i="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${H - T - B}"/>`;
+  });
+  const el = $('#enChart');
+  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  el.setAttribute('aria-label', `英語の語数 ${chartMode === 'day' ? '日ごと' : '月ごと'}。合計${fmt(total)}語`);
+  el.innerHTML = svg;
+  el._data = data;
+  $('#chartTip').hidden = true;
+  const avg = chartMode === 'month' ? Math.round(total / Math.max(1, data.filter((d) => d.v).length)) : 0;
+  $('#chartSum').innerHTML = chartMode === 'day'
+    ? `${viewM + 1}月の合計 <b>${fmt(total)}語</b>`
+    : `12か月の合計 <b>${fmt(total)}語</b>${avg ? `（読んだ月の平均 ${fmt(avg)}語）` : ''}`;
+  $('#chartTable').innerHTML = `<table><tr><th>${chartMode === 'day' ? '日' : '月'}</th><th>語数</th></tr>${data.filter((d) => chartMode === 'month' || d.v).map((d) => `<tr><td>${d.full}</td><td>${fmt(d.v)}</td></tr>`).join('')}</table>`;
+}
+
+function showChartTip(e) {
+  const hit = e.target.closest('.hit');
+  const tip = $('#chartTip');
+  if (!hit) { tip.hidden = true; return; }
+  const d = $('#enChart')._data[+hit.dataset.i];
+  const box = $('#enChart').getBoundingClientRect(), r = hit.getBoundingClientRect();
+  tip.textContent = `${d.full}：${fmt(d.v)}語`;
+  tip.style.left = `${Math.min(box.width - 60, Math.max(60, r.left - box.left + r.width / 2))}px`;
+  tip.style.top = `${r.top - box.top + 12}px`;
+  tip.hidden = false;
 }
 
 // ---------------- おすすめ ----------------
@@ -448,7 +530,6 @@ function showForm() {
 function langFields() {
   const lang = document.querySelector('input[name=fLang]:checked').value;
   $('#enFields').hidden = lang !== 'en'; $('#jaFields').hidden = lang !== 'ja';
-  $('#charPresets').innerHTML = JA_CHAR_PRESETS.map((p) => `<button type="button" data-chars="${p.chars}">${p.label}（約${fmt(p.chars)}字）</button>`).join('');
 }
 
 let pickedChild = null;
@@ -626,7 +707,6 @@ function bind() {
   document.querySelectorAll('input[name=fLang]').forEach((r) => r.addEventListener('change', () => {
     picked.lang = r.value; langFields(); $('#formCover').innerHTML = coverInner(picked.cover, picked.lang);
   }));
-  $('#charPresets').onclick = (e) => { const b = e.target.closest('[data-chars]'); if (b) $('#fChars').value = b.dataset.chars; };
   $('#childPick').onclick = (e) => {
     const b = e.target.closest('[data-cid]'); if (!b) return;
     pickedChild = b.dataset.cid; renderChildPick(pickedChild);
@@ -640,6 +720,10 @@ function bind() {
     editing = null; $('#addDlg').close(); commit(); toast('削除しました');
   };
 
+  $('#chartTabs').addEventListener('change', (e) => { chartMode = e.target.value; renderChart(); });
+  $('#enChart').addEventListener('pointermove', showChartTip);
+  $('#enChart').addEventListener('click', showChartTip);
+  $('#enChart').addEventListener('pointerleave', () => { $('#chartTip').hidden = true; });
   $('#recoTabs').addEventListener('change', (e) => { recoLang = e.target.value; renderReco(); });
   $('#shareOpen').onclick = openShare;
   $('#shareName').onchange = () => { state.settings.shareShowName = $('#shareName').checked; saveLocal(state); drawShare(); };

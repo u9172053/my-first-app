@@ -50,7 +50,7 @@ export async function renderShareImage(canvas, d) {
     ctx.textAlign = 'left'; ctx.font = `800 44px ${FONT}`; ctx.fillText(unit, cx - 22 + nw / 2 + 8, 450);
     ctx.textAlign = 'center'; ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`; ctx.fillText(sub, cx, 525);
   };
-  card(80, C.ja, 'にほんご', fmt(d.jaBooks), '冊', d.jaChars ? `約${fmt(d.jaChars)}字` : `累計 ${fmt(d.totalJa)}冊`);
+  card(80, C.ja, 'にほんご', fmt(d.jaBooks), '冊', d.jaChars ? `${fmt(d.jaChars)}字` : `累計 ${fmt(d.totalJa)}冊`);
   card(80 + cw + 30, C.en, 'English', fmt(d.enWords), '語', `累計 ${fmt(d.totalEn)}語`);
 
   // ミニカレンダー（週の数に合わせて行の高さを調整）

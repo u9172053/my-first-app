@@ -1,4 +1,4 @@
-import { JA_BOOKS, JA_CLASSICS, JA_PAGE_KNOWN, JA_EXACT } from './books-ja.js';
+import { JA_BOOKS, JA_CLASSICS, JA_EXACT } from './books-ja.js';
 import { EN_EXACT, EN_EXTRA, EN_PAGE_KNOWN } from './books-en.js';
 
 // ============================================================
@@ -213,19 +213,17 @@ export const PRESET_BOOKS = [
     pid: 'e' + isbn, lang: 'en', title, author, series, count, lv, isbn, olCover, rl,
     reliable: EN_PAGE_KNOWN.has(isbn), // 実際のページ数から語数を出せた本
   })),
-  // 日本語の本の count は推定文字数（約）。おすすめは対象年齢で選ぶ
+  // 日本語の本の count は実際に数えた文字数だけ（なければ0）。おすすめは対象年齢で選ぶ
   ...JA_BOOKS.map(([title, author, series, age, isbn, c5, c6]) => {
-    // 6列目は推定文字数（数値）。古い形式では表紙用ISBN（文字列）が入っていたので両方に対応
-    let chars = typeof c5 === 'number' ? c5 : 0;
     const coverOnly = typeof c5 === 'string' ? c5 : c6;
-    // 同じ作者の同じ作品が青空文庫にあれば、全文から数えた文字数を使う
+    // 文字数は推定せず、全文から数えた実際の文字数（青空文庫の同じ作者の同じ作品）がある時だけ持つ
     const ex = jaExactFor(title, author);
-    if (ex) chars = ex[4];
+    const chars = ex ? ex[4] : 0;
     return {
       exact: !!ex,
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
-    reliable: JA_PAGE_KNOWN.has(isbn) || !!ex, // 実際のページ数・全文から文字数を出せた本
+    reliable: true, // 日本語は文字数の有無にかかわらず、対象年齢でおすすめする
     coverIsbn: coverOnly || isbn || '', // 表紙を探すISBN
     isbn: isbn || '',                   // 購入リンク用
     };
@@ -237,14 +235,6 @@ export const PRESET_BOOKS = [
   })),
 ];
 
-// 日本語の本の文字数の目安ボタン
-export const JA_CHAR_PRESETS = [
-  { label: '赤ちゃん絵本', chars: 150 },
-  { label: '絵本', chars: 1000 },
-  { label: '長めの絵本', chars: 3000 },
-  { label: '幼年童話', chars: 10000 },
-  { label: '児童書', chars: 40000 },
-];
 
 // 「シリーズ（1冊）」の表紙に使う代表作（表紙の検索にだけ使います）
 export const COVER_QUERY = {
