@@ -180,7 +180,7 @@ export function searchCoverStrict(pid) {
   const book = PRESET_BOOKS.find((b) => b.pid === pid);
   if (!book) return Promise.resolve('');
   const title = (COVER_QUERY[book.series] && isGeneric(book.title)) ? COVER_QUERY[book.series][0] : book.title.replace(/[（(].*?[)）]/g, '').trim();
-  const author = book.author.split(/[\/,・]/)[0].trim();
+  const author = (book.author || '').split(/[\/,・]/)[0].trim();
   const real = (b) => b.cover && !b.cover.includes('ndlsearch');
   const p = (async () => {
     if (book.coverIsbn) {
@@ -209,7 +209,7 @@ export function fetchPresetCover(book) {
   } else {
     const base = book.title.replace(/[（(].*?[)）]/g, '').trim();
     title = base.replace(/^.*#\d+\s*/, '').trim() || base.replace(/\s*#\d+$/, '').trim();
-    author = book.author.split(/[\/,]/)[0].trim();
+    author = (book.author || '').split(/[\/,]/)[0].trim();
   }
   if (inflight.has(book.pid)) return inflight.get(book.pid);
   const order = book.lang === 'ja' ? [googleCover, openLibraryCover] : [openLibraryCover, googleCover];

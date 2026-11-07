@@ -81,6 +81,7 @@ function render() {
   renderStats();
   renderCalendar();
   renderChart();
+  renderAgeChart();
   renderReco();
 }
 
@@ -103,15 +104,15 @@ function renderStats() {
     <div class="stat ${cls}"><div class="lbl">${label}</div>
       <div class="val">${fmt(count)}<small>${unit}</small></div>
       <div class="books">${fmt(books)}冊</div></div>`;
-  // 日本語は冊数が主役（文字数は実際に数えた本・自分で入力した本の分だけ添える）
-  const jaCard = (label, books, chars) => `
+  // 日本語は冊数だけ
+  const jaCard = (label, books) => `
     <div class="stat ja"><div class="lbl">${label}</div>
       <div class="val">${fmt(books)}<small>冊</small></div>
-      <div class="books">${chars ? fmt(chars) + '字' : '&nbsp;'}</div></div>`;
+      <div class="books">&nbsp;</div></div>`;
   $('#stats').innerHTML =
-    jaCard(`${viewM + 1}月の日本語`, month.jaBooks, month.jaChars) +
+    jaCard(`${viewM + 1}月の日本語`, month.jaBooks) +
     card('en', `${viewM + 1}月の英語`, month.en, '語', month.enBooks) +
-    jaCard('日本語の累計', all.jaBooks, all.jaChars) +
+    jaCard('日本語の累計', all.jaBooks) +
     card('en', '英語の累計', all.en, '語', all.enBooks);
 }
 
@@ -217,6 +218,101 @@ function showChartTip(e) {
   tip.hidden = false;
 }
 
+// ---------------- 対象年齢の推移（折れ線） ----------------
+// 「○歳から向け」の数値。日本語：0〜6歳はそのまま、7＝小学校低学年、8＝中学年、9＝高学年
+const jaAgeNum = (a) => (a <= 7 ? a : a === 8 ? 8 : 10);
+// 英語：レベルの目安を英語圏の「○歳から」に（enAge の区切りと同じ）
+const enAgeNum = (lv) => ([[0.5, 1], [1.0, 3], [1.6, 4], [2.4, 5], [3.5, 6], [5.0, 8], [6.5, 9]].find(([m]) => lv <= m) || [0, 10])[1];
+const PRESET_BY_PID = new Map(PRESET_BOOKS.map((b) => [b.pid, b]));
+
+function ageData() {
+  const logs = logsFor();
+  const months = [];
+  for (let k = 11; k >= 0; k--) {
+    const d = new Date(viewY, viewM - k, 1);
+    const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    const row = { label: `${d.getMonth() + 1}月`, full: `${d.getFullYear()}年${d.getMonth() + 1}月` };
+    for (const lang of ['ja', 'en']) {
+      let sum = 0, n = 0;
+      for (const l of logs) {
+        if (l.lang !== lang || !l.date.startsWith(prefix)) continue;
+        const b = PRESET_BY_PID.get(l.pid);
+        const a = lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null ? enAgeNum(b.lv) : null);
+        if (a == null) continue; // リストにない本（年齢不明）は除く
+        const t = l.times || 1; sum += a * t; n += t;
+      }
+      row[lang] = n ? sum / n : null;
+    }
+    months.push(row);
+  }
+  return months;
+}
+
+function renderAgeChart() {
+  const data = ageData();
+  const W = 340, H = 170, L = 30, R = 34, T = 12, B = 22;
+  const vals = data.flatMap((d) => [d.ja, d.en]).filter((v) => v != null);
+  const max = Math.max(6, Math.ceil((Math.max(0, ...vals) + 1) / 2) * 2);
+  const slot = (W - L - R) / data.length;
+  const x = (i) => L + slot * i + slot / 2;
+  const y = (v) => T + (H - T - B) * (1 - v / max);
+  const ageTxt = (v) => `${+v.toFixed(1)}歳〜`;
+  let svg = '';
+  const step = max <= 6 ? 2 : max <= 12 ? 4 : 6;
+  for (let t = 0; t <= max; t += step) {
+    svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${t}歳</text>`;
+  }
+  data.forEach((d, i) => { svg += `<text class="axis" x="${x(i)}" y="${H - 6}" text-anchor="middle">${d.label}</text>`; });
+  const ends = [];
+  for (const lang of ['ja', 'en']) {
+    // データのない月で線を切る
+    let path = '', pen = false, last = -1;
+    data.forEach((d, i) => {
+      if (d[lang] == null) { pen = false; return; }
+      path += `${pen ? 'L' : 'M'}${x(i)},${y(d[lang])} `; pen = true; last = i;
+    });
+    if (path) svg += `<path class="line ${lang}" d="${path}"/>`;
+    data.forEach((d, i) => {
+      if (d[lang] == null) return;
+      svg += lang === 'ja'
+        ? `<circle class="pt ja" cx="${x(i)}" cy="${y(d.ja)}" r="5"/>`
+        : `<rect class="pt en" x="${x(i) - 5}" y="${y(d.en) - 5}" width="10" height="10" rx="2"/>`;
+    });
+    if (last >= 0) ends.push({ lang, i: last, v: data[last][lang] });
+  }
+  // 最新の点にだけ数値（線の端）。2つが近い時は上下にずらして重ならないように
+  if (ends.length === 2 && Math.abs(y(ends[0].v) - y(ends[1].v)) < 14) {
+    const [hi, lo] = ends[0].v >= ends[1].v ? [ends[0], ends[1]] : [ends[1], ends[0]];
+    hi.dy = -8; lo.dy = 12;
+  }
+  for (const e of ends) svg += `<text class="end" x="${x(e.i) + 9}" y="${y(e.v) + (e.dy ?? 4)}">${ageTxt(e.v)}</text>`;
+  data.forEach((d, i) => { svg += `<rect class="hit" data-i="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${H - T - B}"/>`; });
+  const el = $('#ageChart');
+  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  el.setAttribute('aria-label', '読んでいる本の対象年齢の推移（日本語・英語）');
+  el.innerHTML = svg || '';
+  el._data = data; el._geo = { x, T, H, B };
+  $('#ageTip').hidden = true;
+  const cell = (v) => (v == null ? '—' : ageTxt(v));
+  $('#ageTable').innerHTML = `<table><tr><th>月</th><th>日本語</th><th>英語</th></tr>${data.map((d) => `<tr><td>${d.full}</td><td>${cell(d.ja)}</td><td>${cell(d.en)}</td></tr>`).join('')}</table>`;
+}
+
+function showAgeTip(e) {
+  const hit = e.target.closest('.hit');
+  const tip = $('#ageTip'), el = $('#ageChart');
+  el.querySelector('.cross')?.remove();
+  if (!hit) { tip.hidden = true; return; }
+  const i = +hit.dataset.i, d = el._data[i], g = el._geo;
+  if (d.ja == null && d.en == null) { tip.hidden = true; return; }
+  el.insertAdjacentHTML('afterbegin', `<line class="cross" x1="${g.x(i)}" x2="${g.x(i)}" y1="${g.T}" y2="${g.H - g.B}"/>`);
+  const f = (v) => (v == null ? 'なし' : `${+v.toFixed(1)}歳〜`);
+  tip.textContent = `${d.full}　日本語 ${f(d.ja)}／英語 ${f(d.en)}`;
+  const box = el.getBoundingClientRect(), r = hit.getBoundingClientRect();
+  tip.style.left = `${Math.min(box.width - 110, Math.max(110, r.left - box.left + r.width / 2))}px`;
+  tip.style.top = `${r.top - box.top + 12}px`;
+  tip.hidden = false;
+}
+
 // ---------------- おすすめ ----------------
 // 英語：最近読んだ英語の本のレベル平均から「同じくらい」4冊＋「少し上」4冊
 // 日本語：最近読んだ日本語の本の文字数から「同じくらい」4冊＋「少し長め」4冊
@@ -298,7 +394,7 @@ function recoCard(b) {
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
       <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.age) + '（目安）'}</div>
-      <div class="why">${b.count ? `<b class="cnt ${b.lang}">${b.exact ? '' : '約'}${fmt(b.count)}${b.lang === 'en' ? '語' : '字'}</b>・` : ''}${esc(b.author || b.series)}</div>
+      <div class="why">${b.lang === 'en' && b.count ? `<b class="cnt en">${fmt(b.count)}語</b>・` : ''}${esc(b.author || b.series)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>
@@ -396,13 +492,13 @@ function renderDay() {
   if (!dayOpen) return;
   const logs = logsFor().filter((l) => l.date === dayOpen);
   const a = aggregate(logs);
-  $('#daySum').innerHTML = logs.length ? `<span class="ja">日本語 ${a.jaBooks}冊${a.jaChars ? '（約' + fmt(a.jaChars) + '字）' : ''}</span><span class="en">英語 ${fmt(a.en)}語</span>` : '<span class="muted">まだ記録がありません</span>';
+  $('#daySum').innerHTML = logs.length ? `<span class="ja">日本語 ${a.jaBooks}冊</span><span class="en">英語 ${fmt(a.en)}語</span>` : '<span class="muted">まだ記録がありません</span>';
   const multi = children().length > 1;
   $('#dayList').innerHTML = logs.map((l) => {
     const c = multi ? children().find((x) => x.id === l.childId) : null;
     const t = l.times || 1;
     const cnt = countOf(l);
-    const n = l.lang === 'en' ? `${fmt(cnt * t)}語` : `${t}冊${cnt ? '・約' + fmt(cnt * t) + '字' : ''}`;
+    const n = l.lang === 'en' ? (cnt ? `${fmt(cnt * t)}語` : '') : `${t}冊`;
     return `<button class="item" data-log="${l.id}">
       <div class="cover">${coverInner(l.cover, l.lang)}</div>
       <div class="grow"><div class="t"><span class="tag ${l.lang}">${l.lang === 'en' ? '英' : '日'}</span>${esc(l.title)}</div>
@@ -469,10 +565,10 @@ function itemHtml(b) {
   const i = itemIdx++;
   const cover = b.cover || (b.pid ? cachedCover(b.pid) : '');
   const approx = b.pid && !b.exact ? '約' : '';
-  const n = b.count ? (b.lang === 'en' ? `${approx}${fmt(b.count)}語` : `${approx}${fmt(b.count)}字`) : (b.lang === 'en' ? '語数？' : '');
+  const n = b.lang === 'en' && b.count ? `${approx}${fmt(b.count)}語` : '';
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
-    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}</div></div>
+    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}${b.lang === 'en' && b.lv != null ? '・' + enAge(b.lv) : ''}</div></div>
     <div class="n ${b.lang}">${n}</div></button>`;
 }
 
@@ -519,7 +615,7 @@ function showForm() {
   document.querySelector(`input[name=fLang][value=${b.lang}]`).checked = true;
   $('#fWords').value = b.lang === 'en' && b.count ? b.count : '';
   $('#fChars').value = b.lang === 'ja' && b.count ? b.count : '';
-  $('#wordHint').textContent = b.pid ? '（目安・修正できます）' : '';
+  $('#wordHint').textContent = b.exact ? '（全文から数えた語数）' : '（わかる場合は入力）';
   $('#fDate').value = editing?.date || addDate;
   $('#fTimes').value = editing?.times || 1;
   $('#deleteLog').hidden = !editing;
@@ -529,7 +625,7 @@ function showForm() {
 
 function langFields() {
   const lang = document.querySelector('input[name=fLang]:checked').value;
-  $('#enFields').hidden = lang !== 'en'; $('#jaFields').hidden = lang !== 'ja';
+  $('#enFields').hidden = lang !== 'en'; $('#jaFields').hidden = true; // 日本語は冊数だけ記録
 }
 
 let pickedChild = null;
@@ -545,8 +641,7 @@ function renderChildPick(cid) {
 function saveForm(e) {
   e.preventDefault();
   const lang = document.querySelector('input[name=fLang]:checked').value;
-  const count = Math.max(0, parseInt(lang === 'en' ? $('#fWords').value : $('#fChars').value, 10) || 0);
-  if (lang === 'en' && !count && !confirm('語数が0のまま記録しますか？')) return;
+  const count = lang === 'en' ? Math.max(0, parseInt($('#fWords').value, 10) || 0) : 0;
   const now = Date.now();
   const data = {
     childId: pickedChild || children()[0].id,
@@ -720,6 +815,9 @@ function bind() {
     editing = null; $('#addDlg').close(); commit(); toast('削除しました');
   };
 
+  $('#ageChart').addEventListener('pointermove', showAgeTip);
+  $('#ageChart').addEventListener('click', showAgeTip);
+  $('#ageChart').addEventListener('pointerleave', () => { $('#ageTip').hidden = true; $('#ageChart .cross')?.remove(); });
   $('#chartTabs').addEventListener('change', (e) => { chartMode = e.target.value; renderChart(); });
   $('#enChart').addEventListener('pointermove', showChartTip);
   $('#enChart').addEventListener('click', showChartTip);

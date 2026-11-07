@@ -111,6 +111,26 @@ h1, h2, h3, h4 { margin: 0; line-height: 1.3; }
 .chart-table td, .chart-table th { padding: 2px 6px; text-align: right; border-bottom: 1px solid var(--line); }
 .chart-table td:first-child, .chart-table th:first-child { text-align: left; }
 
+#ageChart { width: 100%; height: auto; display: block; overflow: visible; }
+#ageChart .grid { stroke: var(--line); stroke-width: 1; }
+#ageChart .axis { fill: var(--sub); font-size: 10px; }
+#ageChart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+#ageChart .line.ja, #ageChart .pt.ja { stroke: var(--ja); }
+#ageChart .line.en, #ageChart .pt.en { stroke: var(--en); }
+#ageChart .pt { stroke: var(--card); stroke-width: 2; }
+#ageChart .pt.ja { fill: var(--ja); }
+#ageChart .pt.en { fill: var(--en); }
+#ageChart .end { fill: var(--ink); font-size: 10px; font-weight: 800; }
+#ageChart .hit { fill: transparent; cursor: pointer; }
+#ageChart .cross { stroke: var(--sub); stroke-width: 1; stroke-dasharray: 3 3; }
+.legend-row { display: flex; gap: 14px; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.legend-row .lg { display: inline-flex; align-items: center; gap: 5px; }
+.legend-row .mk { display: inline-block; width: 10px; height: 10px; }
+.legend-row .ja .mk { background: var(--ja); }
+.legend-row .en .mk { background: var(--en); }
+.legend-row .mk.circle { border-radius: 50%; }
+.legend-row .mk.square { border-radius: 2px; }
+
 /* fab */
 .fab {
   position: sticky; bottom: 14px; z-index: 5; display: block; width: 100%; margin: 4px 0 14px;

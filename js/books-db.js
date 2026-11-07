@@ -1,5 +1,5 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT } from './books-ja.js';
-import { EN_EXACT, EN_EXTRA, EN_PAGE_KNOWN } from './books-en.js';
+import { EN_EXACT, EN_EXTRA } from './books-en.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -8,7 +8,7 @@ import { EN_EXACT, EN_EXTRA, EN_PAGE_KNOWN } from './books-en.js';
 //  lv = 読みやすさレベルの目安（0.0〜9.9、SSSのYLに近い感覚）
 // ============================================================
 
-// [タイトル, 著者, シリーズ, 語数, レベル]
+// [タイトル, 著者, シリーズ, （旧：語数の目安。今は使わない）, レベル]
 const EN = [
   // --- 絵本（はじめての1冊） ---
   ['Rosie\'s Walk', 'Pat Hutchins', '', 32, 0.2],
@@ -197,21 +197,20 @@ const normTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
 const EXACT_BY_TITLE = new Map(EN_EXACT.map((r) => [normTitle(r[0]), r]));
 const EN_TITLES = new Set(EN.map((r) => normTitle(r[0])));
 export const PRESET_BOOKS = [
-  // 定番（手で選んだ本）。全文から数えた語数がある本はそちらを使う
-  ...EN.map(([title, author, series, count, lv]) => {
+  // 定番（手で選んだ本）。語数は推定値を使わず、全文から数えた語数がある本だけ持つ
+  ...EN.map(([title, author, series, , lv]) => {
     const ex = EXACT_BY_TITLE.get(normTitle(title));
     return ex
       ? { pid: 'p' + (++_id), lang: 'en', title, author, series, count: ex[2], lv, exact: true, isbn: ex[4], olCover: ex[5], classic: true, reliable: true }
-      : { pid: 'p' + (++_id), lang: 'en', title, author, series, count, lv, classic: true, reliable: true };
+      : { pid: 'p' + (++_id), lang: 'en', title, author, series, count: 0, lv, classic: true, reliable: true };
   }),
   // 名作（Project Gutenberg の全文から数えた実際の語数）
   ...EN_EXACT.filter((r) => !EN_TITLES.has(normTitle(r[0]))).map(([title, author, count, lv, isbn, olCover, pg, rl]) => ({
     pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true, reliable: true,
   })),
-  // 定番作家の作品（語数は推定）
-  ...EN_EXTRA.map(([title, author, series, count, lv, isbn, olCover, rl]) => ({
-    pid: 'e' + isbn, lang: 'en', title, author, series, count, lv, isbn, olCover, rl,
-    reliable: EN_PAGE_KNOWN.has(isbn), // 実際のページ数から語数を出せた本
+  // 定番作家の作品（語数なし。記録する時に入力できる）
+  ...EN_EXTRA.map(([title, author, series, lv, isbn, olCover, rl]) => ({
+    pid: 'e' + isbn, lang: 'en', title, author, series, count: 0, lv, isbn, olCover, rl, reliable: true,
   })),
   // 日本語の本の count は実際に数えた文字数だけ（なければ0）。おすすめは対象年齢で選ぶ
   ...JA_BOOKS.map(([title, author, series, age, isbn, c5, c6]) => {
