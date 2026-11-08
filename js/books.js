@@ -50,7 +50,7 @@ const isJapanese = (s = '') => /[぀-ヿ一-鿿]/.test(s);
 // ・DK Super Readers（DK 公表）：Pre-Level＝3〜5歳
 const T = (name, lo, hi, src) => ({ label: `${name}：${lo}〜${hi ?? ''}歳（${src}）`, age: lo });
 const SERIES_TARGETS = [
-  { re: /step\s*into\s*reading/i, level: /step\s*([1-5])\b/i, map: {
+  { re: /step\s*into\s*reading/i, level: /(?:step\s*into\s*reading\s+(?:step\s*)?|step\s*)([1-5])\b/i, map: {
     1: T('Step into Reading 1', 4, 6, '出版社の対象'), 2: T('Step into Reading 2', 4, 7, '出版社の対象'),
     3: T('Step into Reading 3', 6, 9, '出版社の対象'), 4: T('Step into Reading 4', 7, 9, '出版社の対象'),
     5: T('Step into Reading 5', 7, 10, '出版社の対象'),
