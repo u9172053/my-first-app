@@ -35,13 +35,17 @@ function commit() {
 }
 
 // ---------------- 集計 ----------------
-const children = () => state.children.filter((c) => !c.deleted);
+// 「モデル」：見本の5年分の記録。端末にもGoogleドライブにも保存せず、開くたびに同じ内容を作り直す
+const MODEL = { id: 'model', name: 'モデル', emoji: '⭐', model: true };
+let demoLogs = null;
+const modelLogs = () => (demoLogs ||= genModel());
+const children = () => [...state.children.filter((c) => !c.deleted), ...(state.settings.model ? [MODEL] : [])];
 // 表示中の人（「みんな」の合計表示はなくしたので、必ずだれか1人）
 const activeChild = () => {
   const a = state.settings.activeChild;
   return children().some((c) => c.id === a) ? a : children()[0]?.id;
 };
-const logsFor = (cid = activeChild()) => state.logs.filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
+const logsFor = (cid = activeChild()) => (cid === 'model' ? modelLogs() : state.logs).filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
 
 // 文字数・語数が0で記録された本は、リストにある推定値で補う（以前の記録も集計に入るように）
 const PRESET_COUNT = new Map(PRESET_BOOKS.map((b) => [b.pid, b.count]));
@@ -234,54 +238,80 @@ function logAge(l) {
   return b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null;
 }
 
-// 表示している月までの12か月分の記録を、1冊ずつ点にする
+// 記録を1冊ずつ点にする。期間は「表示している月までの12か月」か「最初の記録から最新の記録まで」
+let ageRange = '12m';
 function ageData() {
-  const start = new Date(viewY, viewM - 11, 1), end = new Date(viewY, viewM + 1, 1);
-  const s0 = ymd(start), s1 = ymd(end);
-  const pts = logsFor().filter((l) => l.date >= s0 && l.date < s1)
-    .map((l) => ({ l, age: logAge(l) })).filter((p) => p.age != null)
+  const all = logsFor().map((l) => ({ l, age: logAge(l) })).filter((p) => p.age != null)
     .sort((a, b) => (a.l.date < b.l.date ? -1 : a.l.date > b.l.date ? 1 : 0));
-  return { start, end, pts };
+  let start, end;
+  if (ageRange === 'all' && all.length) {
+    const [y0, m0] = all[0].l.date.split('-').map(Number), [y1, m1] = all[all.length - 1].l.date.split('-').map(Number);
+    start = new Date(y0, m0 - 1, 1); end = new Date(y1, m1, 1);
+    if ((end - start) / 864e5 < 360) start = new Date(end.getFullYear(), end.getMonth() - 12, 1); // 1年未満なら12か月ぶん
+  } else {
+    start = new Date(viewY, viewM - 11, 1); end = new Date(viewY, viewM + 1, 1);
+  }
+  const s0 = ymd(start), s1 = ymd(end);
+  const pts = all.filter((p) => p.l.date >= s0 && p.l.date < s1);
+  const months = (end.getFullYear() - start.getFullYear()) * 12 + end.getMonth() - start.getMonth();
+  return { start, end, pts, months };
 }
 
 function renderAgeChart() {
-  const { start, end, pts } = ageData();
-  const W = 340, H = 130, L = 30, R = 10, T = 8, B = 20;
+  const { start, end, pts, months } = ageData();
+  const W = 340, H = months > 12 ? 170 : 130, L = 30, R = 10, T = 8, B = 20;
   const maxAge = Math.max(6, ...pts.map((p) => p.age));
   const max = Math.ceil((maxAge + 1) / 2) * 2;
   const span = end - start;
   const x = (date) => L + (W - L - R) * ((new Date(date) - start) / span);
   const y = (v) => T + (H - T - B) * (1 - v / max);
   let svg = '';
-  const step = max <= 6 ? 2 : max <= 12 ? 4 : 6;
+  const step = max <= 8 ? 2 : max <= 12 ? 4 : 6;
   for (let t = 0; t <= max; t += step) svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${t}歳</text>`;
-  for (let k = 0; k < 12; k += 2) {
-    const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
-    svg += `<text class="axis" x="${x(d) + 4}" y="${H - 5}">${d.getMonth() + 1}月</text>`;
+  if (months > 24) { // 長い期間は年ごとの目盛り
+    for (let k = 0; k < months; k++) {
+      const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
+      if (d.getMonth() !== 0) continue;
+      svg += `<line class="grid" x1="${x(d)}" x2="${x(d)}" y1="${T}" y2="${H - B}"/><text class="axis" x="${x(d) + 3}" y="${H - 5}">${d.getFullYear()}</text>`;
+    }
+  } else {
+    const st = Math.max(2, Math.ceil(months / 6));
+    for (let k = 0; k < months; k += st) {
+      const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
+      svg += `<text class="axis" x="${x(d) + 4}" y="${H - 5}">${k === 0 || d.getMonth() === 0 ? `${String(d.getFullYear()).slice(2)}年` : ''}${d.getMonth() + 1}月</text>`;
+    }
   }
-  // 直近8冊の平均の線（上がっていく様子を見やすくする）
+  // 直近の平均の線（上がっていく様子を見やすくする。点が多いときは平均する冊数も増やす）
+  const win = Math.max(8, Math.round(pts.length / 40));
+  let trend = '';
   for (const lang of ['ja', 'en']) {
     const ps = pts.filter((p) => p.l.lang === lang);
     if (ps.length < 3) continue;
     const line = ps.map((p, i) => {
-      const w = ps.slice(Math.max(0, i - 7), i + 1);
+      const w = ps.slice(Math.max(0, i - win + 1), i + 1);
       return `${i ? 'L' : 'M'}${x(p.l.date).toFixed(1)},${y(w.reduce((s, q) => s + q.age, 0) / w.length).toFixed(1)}`;
     }).join(' ');
-    svg += `<path class="trend ${lang}" d="${line}"/>`;
+    trend += `<path class="trend-halo" d="${line}"/><path class="trend ${lang}" d="${line}"/>`;
   }
   // 1冊ずつの点（同じ日・同じ年齢の点は少し横にずらす）
   const seen = new Map();
+  const big = pts.length > 300, r = big ? 2 : 3.5, gap = big ? 0 : 4;
   const drawn = pts.map((p) => {
     const key = p.l.date + p.l.lang + p.age;
     const n = seen.get(key) || 0; seen.set(key, n + 1);
-    const cx = x(p.l.date) + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 4, cy = y(p.age);
+    const cx = x(p.l.date) + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * gap;
+    // 点が多いときは、同じ年齢の点が1本の線に重ならないよう上下に少しだけ散らす（値そのものは変えない）
+    // 日本語は少し上、英語は少し下に寄せて、同じ年齢でも両方の点が見えるようにする
+    const jit = big ? ((((n * 7 + p.l.date.charCodeAt(9) * 13 + p.l.title.length * 5) % 11) / 10) * 0.3 + 0.03) * (p.l.lang === 'ja' ? 1 : -1) : 0;
+    const cy = y(p.age + jit);
     return { ...p, cx, cy };
   });
   for (const d of drawn) {
     svg += d.l.lang === 'ja'
-      ? `<circle class="dot ja" cx="${d.cx.toFixed(1)}" cy="${d.cy.toFixed(1)}" r="3.5"/>`
-      : `<rect class="dot en" x="${(d.cx - 3.5).toFixed(1)}" y="${(d.cy - 3.5).toFixed(1)}" width="7" height="7" rx="1.5"/>`;
+      ? `<circle class="dot ja" cx="${d.cx.toFixed(1)}" cy="${d.cy.toFixed(1)}" r="${r}"/>`
+      : `<rect class="dot en" x="${(d.cx - r).toFixed(1)}" y="${(d.cy - r).toFixed(1)}" width="${r * 2}" height="${r * 2}" rx="${r / 2}"/>`;
   }
+  svg += trend; // 平均の線は点の上に重ねる
   const el = $('#ageChart');
   el.setAttribute('viewBox', `0 0 ${W} ${H}`);
   el.setAttribute('aria-label', `読んだ本の対象年齢。${pts.length}冊`);
@@ -289,15 +319,16 @@ function renderAgeChart() {
   el._pts = drawn;
   $('#ageTip').hidden = true;
   $('#ageEmpty').hidden = pts.length > 0;
-  // 表：月ごとの平均
-  const rows = [];
-  for (let k = 0; k < 12; k++) {
-    const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
-    const pre = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-    const avg = (lang) => { const a = pts.filter((p) => p.l.lang === lang && p.l.date.startsWith(pre)); return a.length ? `${+(a.reduce((s, p) => s + p.age, 0) / a.length).toFixed(1)}歳〜（${a.length}冊）` : '—'; };
-    rows.push(`<tr><td>${d.getFullYear()}年${d.getMonth() + 1}月</td><td>${avg('ja')}</td><td>${avg('en')}</td></tr>`);
+  // 表：月ごと（長い期間は半年ごと）の平均
+  const rows = [], per = months > 24 ? 6 : 1;
+  const avg = (ps) => (ps.length ? `${+(ps.reduce((s, p) => s + p.age, 0) / ps.length).toFixed(1)}歳〜（${ps.length}冊）` : '—');
+  for (let k = 0; k < months; k += per) {
+    const d = new Date(start.getFullYear(), start.getMonth() + k, 1), e = new Date(start.getFullYear(), start.getMonth() + k + per, 1);
+    const a = ymd(d), b = ymd(e), inR = pts.filter((p) => p.l.date >= a && p.l.date < b);
+    const label = per === 1 ? `${d.getFullYear()}年${d.getMonth() + 1}月` : `${d.getFullYear()}年${d.getMonth() + 1}月〜`;
+    rows.push(`<tr><td>${label}</td><td>${avg(inR.filter((p) => p.l.lang === 'ja'))}</td><td>${avg(inR.filter((p) => p.l.lang === 'en'))}</td></tr>`);
   }
-  $('#ageTable').innerHTML = `<table><tr><th>月（平均）</th><th>日本語</th><th>英語</th></tr>${rows.join('')}</table>`;
+  $('#ageTable').innerHTML = `<table><tr><th>${per === 1 ? '月' : '半年'}（平均）</th><th>日本語</th><th>英語</th></tr>${rows.join('')}</table>`;
 }
 
 // 点をタップ（またはなぞる）と、いちばん近い本の名前と対象年齢を出す
@@ -311,7 +342,7 @@ function showAgeTip(e) {
   for (const p of el._pts) { const d = (p.cx - px) ** 2 + (p.cy - py) ** 2; if (d < bd) { bd = d; best = p; } }
   if (!best) { tip.hidden = true; return; }
   const [, m, dd] = best.l.date.split('-');
-  tip.textContent = `${+m}/${+dd}　${best.l.title.slice(0, 24)}（${+best.age.toFixed(1)}歳〜）`;
+  tip.textContent = `${ageRange === 'all' ? best.l.date.slice(2, 4) + '/' : ''}${+m}/${+dd}　${best.l.title.slice(0, 24)}（${+best.age.toFixed(1)}歳〜）`;
   tip.style.left = `${Math.min(box.width - 120, Math.max(120, best.cx / sx))}px`;
   tip.style.top = `${best.cy / sx - 6}px`;
   tip.hidden = false;
@@ -734,7 +765,7 @@ function saveForm(e) {
     count, times: Math.max(1, parseInt($('#fTimes').value, 10) || 1), updatedAt: now,
   };
   if (editing) Object.assign(editing, data);
-  else state.logs.push({ id: uid(), createdAt: now, ...data });
+  else (data.childId === 'model' ? modelLogs() : state.logs).push({ id: uid(), createdAt: now, ...data });
   // 表示月を記録日に合わせる
   const [y, m] = data.date.split('-').map(Number);
   viewY = y; viewM = m - 1;
@@ -821,6 +852,70 @@ function renderSettings() {
     g.innerHTML = `<p class="muted small">ログインすると、あなたのGoogleドライブ（アプリ専用の非公開領域）に自動保存され、スマホとPCで共有できます。サイト運営者からは見えません。</p>
       <button class="btn primary wide" id="gIn">Googleでログイン</button>`;
   }
+  $('#modelBtn').textContent = state.settings.model ? '🗑 モデルケース（見本）を消す' : '⭐ モデルケース（5年分の見本）を表示';
+}
+
+function removeModel() {
+  if (!confirm('モデルケース（見本の記録）を消しますか？')) return;
+  state.settings.model = false; demoLogs = null;
+  if (state.settings.activeChild === 'model') state.settings.activeChild = children()[0]?.id;
+  commit(); renderSettings(); toast('モデルケースを消しました');
+}
+
+// ---------------- モデルケース（見本データ）を作る ----------------
+// 1歳から6歳まで5年分。年齢が上がるにつれて読む本の対象年齢も上がり、
+// ときどき下の年齢向けの本（お気に入りの読み返しなど）もはさむ。
+function genModel() {
+  let seed = 20211108;
+  const rnd = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const pick = (a) => a[Math.floor(rnd() * a.length)];
+  // リストの本を対象年齢ごとに分けておく（英語は語数が分かる本を優先）
+  const pool = { ja: new Map(), en: new Map() };
+  for (const b of PRESET_BOOKS) {
+    const k = knownAge(b); if (!k || /平均/.test(b.title)) continue;
+    if (b.lang === 'en' && b.gr && /Bookworms|Penguin|Cambridge|Macmillan|Pearson/i.test(b.gr)) continue;
+    const a = Math.round(k.age), m = pool[b.lang];
+    if (!m.has(a)) m.set(a, []);
+    m.get(a).push({ b, k });
+  }
+  for (const m of Object.values(pool)) for (const [a, list] of m) {
+    const withCount = list.filter((x) => x.b.count > 0);
+    if (withCount.length >= 4) m.set(a, withCount); // 英語は語数が分かる本だけにして、語数グラフも見本らしく
+  }
+  const nearest = (lang, want) => {
+    const m = pool[lang]; const ages = [...m.keys()];
+    const a = ages.reduce((best, x) => (Math.abs(x - want) < Math.abs(best - want) ? x : best), ages[0]);
+    return pick(m.get(a));
+  };
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const start = new Date(end.getFullYear() - 5, end.getMonth(), end.getDate());
+  const logs = []; let n = 0;
+  const favs = { ja: [], en: [] };
+  for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const years = (d - start) / (365.25 * 864e5); // 0〜5
+    const childAge = 1 + years;
+    const add = (lang, want) => {
+      let x;
+      if (favs[lang].length && rnd() < 0.12) x = pick(favs[lang]); // お気に入りを読み返す
+      else if (rnd() < 0.18) x = nearest(lang, Math.max(0, want - 1 - Math.floor(rnd() * 2))); // ときどき易しい本
+      else x = nearest(lang, Math.max(0, want + (rnd() - 0.5) * 1.6));
+      if (rnd() < 0.15) { favs[lang].push(x); if (favs[lang].length > 12) favs[lang].shift(); }
+      const { b, k } = x;
+      logs.push({
+        id: 'model' + (++n), childId: 'model', date: ymd(d), lang, title: b.title, author: b.author || '',
+        cover: b.cover || '', isbn: b.isbn || '', pid: b.pid || '', tgt: k.label || '', tgtAge: k.age,
+        count: lang === 'en' ? b.count || 0 : 0, times: 1, updatedAt: 1, demo: true,
+      });
+    };
+    // 日本語：毎日のように1〜2冊
+    if (rnd() < 0.62) { add('ja', childAge - 0.4); if (rnd() < 0.3) add('ja', childAge - 0.4); }
+    // 英語：1歳半ごろから。だんだん読む日が増え、対象年齢は日本語より少しゆっくり上がる
+    if (childAge >= 1.5 && rnd() < 0.25 + years * 0.08) {
+      const want = 1 + (childAge - 1.5) * 0.85;
+      add('en', want); if (childAge > 4 && rnd() < 0.25) add('en', want);
+    }
+  }
+  return logs;
 }
 
 function updateSyncUi(status, msg) {
@@ -874,7 +969,7 @@ function bind() {
   $('#dayAdd').onclick = () => { $('#dayDlg').close(); openAdd(dayOpenLast); };
   $('#dayList').onclick = (e) => {
     const it = e.target.closest('[data-log]'); if (!it) return;
-    const log = state.logs.find((l) => l.id === it.dataset.log);
+    const log = state.logs.find((l) => l.id === it.dataset.log) || demoLogs?.find((l) => l.id === it.dataset.log);
     $('#dayDlg').close(); openAdd(log.date, log);
   };
 
@@ -949,7 +1044,7 @@ function bind() {
   };
   $('#childList').addEventListener('change', (e) => {
     const row = e.target.closest('.child-row'); if (!row) return;
-    const c = state.children.find((x) => x.id === row.dataset.cid);
+    const c = children().find((x) => x.id === row.dataset.cid);
     c.name = row.querySelector('.name').value.trim() || c.name;
     c.emoji = row.querySelector('.emoji').value.trim() || c.emoji;
     c.adult = row.querySelector('.is-adult').checked;
@@ -958,7 +1053,8 @@ function bind() {
   $('#childList').addEventListener('click', (e) => {
     if (!e.target.closest('.del')) return;
     const row = e.target.closest('.child-row');
-    const c = state.children.find((x) => x.id === row.dataset.cid);
+    const c = children().find((x) => x.id === row.dataset.cid);
+    if (c.model) { removeModel(); return; }
     const n = state.logs.filter((l) => l.childId === c.id && !l.deleted).length;
     if (!confirm(`「${c.name}」を削除しますか？（記録${n}件も削除されます）`)) return;
     const now = Date.now();
@@ -973,6 +1069,16 @@ function bind() {
       if (confirm('Google連携を解除しますか？（この端末の記録は残ります）')) { sync.signOut(); renderSettings(); }
     }
   });
+  $('#modelBtn').onclick = () => {
+    if (state.settings.model) { removeModel(); return; }
+    state.settings.model = true; demoLogs = null;
+    state.settings.activeChild = 'model'; ageRange = 'all';
+    const r = document.querySelector('input[name=ageRange][value=all]'); if (r) r.checked = true;
+    viewY = today.getFullYear(); viewM = today.getMonth();
+    commit(); renderSettings(); $('#setDlg').close();
+    toast(`⭐ モデルの記録（${modelLogs().length}件）を表示しています`);
+  };
+  $('#ageTabs').addEventListener('change', (e) => { ageRange = e.target.value; renderAgeChart(); });
   $('#exportBtn').onclick = exportData;
   $('#importFile').onchange = (e) => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; };
   $('#resetBtn').onclick = () => {

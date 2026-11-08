@@ -66,7 +66,11 @@
 
   <section class="card chart-card">
     <div class="sec-head"><h2>🎂 読んでいる本の対象年齢</h2></div>
-    <p class="chart-sum">読んだ本1冊ごとの対象年齢（○歳から向け）を点で表示します。線は直近8冊の平均です。</p>
+    <div class="seg chart-tabs" id="ageTabs" role="radiogroup" aria-label="グラフの期間">
+      <label><input type="radio" name="ageRange" value="12m" checked><span>直近12か月</span></label>
+      <label><input type="radio" name="ageRange" value="all"><span>これまで全部</span></label>
+    </div>
+    <p class="chart-sum">読んだ本1冊ごとの対象年齢（○歳から向け）を点で表示します。線は直近の平均です。</p>
     <div class="legend-row"><span class="lg ja"><i class="mk circle"></i>日本語</span><span class="lg en"><i class="mk square"></i>英語</span></div>
     <div class="chart-wrap" id="ageWrap">
       <svg id="ageChart" role="img"></svg>
@@ -220,6 +224,7 @@
   <p class="muted small">大人の英語学習者は「大人」にチェックすると、おすすめに Oxford Bookworms などの学習者向けの本と、同じレベルの子ども向けの本が半分ずつ出ます。</p>
   <div id="childList" class="child-list"></div>
   <button id="addChild" class="btn wide">＋ 読む人を追加</button>
+  <button id="modelBtn" class="btn ghost wide mt"></button>
 
   <h4 id="gHead">☁️ Googleアカウントで保存</h4>
   <div id="gArea"></div>
