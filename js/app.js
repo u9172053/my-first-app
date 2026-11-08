@@ -665,11 +665,31 @@ function showForm() {
   $('#fWords').value = b.lang === 'en' && b.count ? b.count : '';
   $('#fChars').value = b.lang === 'ja' && b.count ? b.count : '';
   $('#wordHint').textContent = b.published ? '（出版社の公表値）' : b.exact ? '' : '（わかる場合は入力）';
+  fillAgeField(b, editing);
   $('#fDate').value = editing?.date || addDate;
   $('#fTimes').value = editing?.times || 1;
   $('#deleteLog').hidden = !editing;
   langFields();
   renderChildPick(editing?.childId);
+}
+
+// 記録画面の「対象年齢」：分かっている年齢を自動で選び、分からなければ自分で選べる
+function knownAge(b) {
+  const p = b.pid ? PRESET_BY_PID.get(b.pid) : null;
+  if (b.tgtAge != null) return { age: b.tgtAge, label: b.tgt };
+  if (p?.tgtAge != null) return { age: p.tgtAge, label: p.tgt };
+  if (b.lang === 'ja' && p?.age != null) return { age: jaAgeNum(p.age), label: jaAge(p.age) + '（目安）' };
+  if (b.lang === 'en' && p?.lv != null && !/Bookworms/.test(p.gr || '')) return { age: enAgeNum(p.lv), label: enAge(p.lv) + '（目安）' };
+  return null;
+}
+function fillAgeField(b, log) {
+  const opts = ['<option value="">わからない</option>'];
+  for (let a = 0; a <= 12; a++) opts.push(`<option value="${a}">${a}歳〜</option>`);
+  $('#fAge').innerHTML = opts.join('');
+  const k = log?.tgtAge != null ? { age: log.tgtAge, label: log.tgt } : knownAge(b);
+  $('#fAge').value = k ? String(Math.round(k.age)) : '';
+  $('#fAge').dataset.auto = k ? String(Math.round(k.age)) : '';
+  $('#ageHint').textContent = k?.label ? `（${k.label.replace(/^[^：]*：/, '')}）` : '（わかる場合は選択）';
 }
 
 function langFields() {
@@ -687,6 +707,16 @@ function renderChildPick(cid) {
     cs.map((c) => `<button type="button" data-cid="${c.id}" class="${c.id === pickedChild ? 'on' : ''}">${esc(c.emoji)} ${esc(c.name)}</button>`).join('');
 }
 
+function ageFromForm() {
+  const v = $('#fAge').value;
+  if (v === '') return { tgt: '', tgtAge: null };
+  if (v === $('#fAge').dataset.auto) {
+    const k = editing?.tgtAge != null ? { age: editing.tgtAge, label: editing.tgt } : knownAge(picked || {});
+    return { tgt: k?.label || `${v}歳〜`, tgtAge: k?.age ?? +v };
+  }
+  return { tgt: `${v}歳〜（手入力）`, tgtAge: +v };
+}
+
 function saveForm(e) {
   e.preventDefault();
   const lang = document.querySelector('input[name=fLang]:checked').value;
@@ -697,7 +727,7 @@ function saveForm(e) {
     date: $('#fDate').value || todayStr(),
     lang, title: $('#fTitle').value.trim() || '（無題）', author: $('#fAuthor').value.trim(),
     cover: picked?.cover || '', isbn: picked?.isbn || '', pid: picked?.pid || '',
-    tgt: picked?.tgt || '', tgtAge: picked?.tgtAge ?? null,
+    ...ageFromForm(),
     count, times: Math.max(1, parseInt($('#fTimes').value, 10) || 1), updatedAt: now,
   };
   if (editing) Object.assign(editing, data);
