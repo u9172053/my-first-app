@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -962,6 +962,15 @@ function autoHeight() {
 
 // リスト外の英語の本で、出版社の対象がまだ分からない記録は、別の版から対象を探して補う（1回あたり数冊まで）
 async function backfillTargets() {
+  // 以前の学年表記（「小1〜小3」など）で保存した対象を、年齢表記に直す
+  let migrated = false;
+  for (const l of state.logs) {
+    if (l.tgt && /小\d|プレスクール|年長/.test(l.tgt)) {
+      const t = seriesTarget(l.tgt);
+      if (t) { l.tgt = t.label; l.tgtAge = t.age; l.updatedAt = Date.now(); migrated = true; }
+    }
+  }
+  if (migrated) commit();
   const todo = state.logs.filter((l) => !l.deleted && l.lang === 'en' && !l.pid && !l.tgt && !l.tgtChecked).slice(0, 5);
   let changed = false;
   for (const l of todo) {
