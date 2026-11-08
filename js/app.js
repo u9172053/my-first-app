@@ -238,7 +238,8 @@ function ageData() {
       for (const l of logs) {
         if (l.lang !== lang || !l.date.startsWith(prefix)) continue;
         const b = PRESET_BY_PID.get(l.pid);
-        const a = lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null);
+        const a = l.tgtAge != null ? l.tgtAge
+          : lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null);
         if (a == null) continue; // リストにない本（年齢不明）は除く
         const t = l.times || 1; sum += a * t; n += t;
       }
@@ -617,7 +618,7 @@ function itemHtml(b) {
   const n = b.lang === 'en' && b.count ? `${approx}${fmt(b.count)}語` : '';
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
-    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}${b.lang === 'en' && (b.gr || b.lbl || b.lv != null) ? '・' + (b.gr || b.lbl || enAge(b.lv)) : ''}</div></div>
+    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}${b.tgt ? '・' + esc(b.tgt) : b.lang === 'en' && (b.gr || b.lbl || b.lv != null) ? '・' + (b.gr || b.lbl || enAge(b.lv)) : ''}</div></div>
     <div class="n ${b.lang}">${n}</div></button>`;
 }
 
@@ -650,7 +651,7 @@ function onSearch() {
 }
 
 function pickBook(b) {
-  picked = { title: b.title, author: b.author || '', cover: b.cover || (b.pid ? cachedCover(b.pid) || '' : ''), isbn: b.isbn || '', lang: b.lang || 'en', count: b.count || 0, pid: b.pid || '', exact: !!b.exact, published: !!b.published };
+  picked = { title: b.title, author: b.author || '', cover: b.cover || (b.pid ? cachedCover(b.pid) || '' : ''), isbn: b.isbn || '', lang: b.lang || 'en', count: b.count || 0, pid: b.pid || '', exact: !!b.exact, published: !!b.published, tgt: b.tgt || '', tgtAge: b.tgtAge ?? null };
   editing = null;
   showForm();
 }
@@ -697,6 +698,7 @@ function saveForm(e) {
     date: $('#fDate').value || todayStr(),
     lang, title: $('#fTitle').value.trim() || '（無題）', author: $('#fAuthor').value.trim(),
     cover: picked?.cover || '', isbn: picked?.isbn || '', pid: picked?.pid || '',
+    tgt: picked?.tgt || '', tgtAge: picked?.tgtAge ?? null,
     count, times: Math.max(1, parseInt($('#fTimes').value, 10) || 1), updatedAt: now,
   };
   if (editing) Object.assign(editing, data);

@@ -41,15 +41,57 @@ const ndlThumb = (isbn) => (/^97[89]\d{10}$/.test(isbn || '') ? `https://ndlsear
 
 const isJapanese = (s = '') => /[぀-ヿ一-鿿]/.test(s);
 
+// ---------------- 出版社が公表しているシリーズのレベル別の対象 ----------------
+// Step into Reading（Random House）：Step 1＝Preschool〜K、2＝Preschool〜Grade 1、3＝Grade 1〜3、4＝Grade 2〜3、5＝Grade 2〜4
+// DK Super Readers（DK）：Pre-Level＝3〜5歳
+// 年齢は米国の学年からの換算（Preschool 3〜5歳、K 5〜6歳、Grade 1 6〜7歳…）
+const SERIES_TARGETS = [
+  { re: /step\s*into\s*reading/i, level: /step\s*([1-5])\b/i, map: {
+    1: { label: 'Step into Reading 1：プレスクール〜年長（出版社の対象）', age: 4 },
+    2: { label: 'Step into Reading 2：プレスクール〜小1（出版社の対象）', age: 5 },
+    3: { label: 'Step into Reading 3：小1〜小3（出版社の対象）', age: 6 },
+    4: { label: 'Step into Reading 4：小2〜小3（出版社の対象）', age: 7 },
+    5: { label: 'Step into Reading 5：小2〜小4（出版社の対象）', age: 7 },
+  } },
+  { re: /dk\s*super\s*readers/i, level: /(pre-?\s*level)/i, map: {
+    'pre-level': { label: 'DK Super Readers Pre-Level：3〜5歳（出版社の対象）', age: 3 },
+  } },
+];
+// タイトル・副題・説明文などから、出版社が決めた対象を探す
+export function seriesTarget(...texts) {
+  const t = texts.filter(Boolean).join(' ');
+  for (const s of SERIES_TARGETS) {
+    if (!s.re.test(t)) continue;
+    const m = t.match(s.level);
+    if (!m) continue;
+    const key = /^\d$/.test(m[1]) ? m[1] : m[1].toLowerCase().replace(/\s+/g, '').replace('prelevel', 'pre-level');
+    if (s.map[key]) return s.map[key];
+  }
+  return null;
+}
+
+// 出版社の説明文にある「ages 5-8」「for ages 3 to 5」「Ages 4+」などの対象年齢
+export function agesFromText(text) {
+  const m = (text || '').match(/\bages?\s+(\d{1,2})\s*(?:-|–|—|to)\s*(\d{1,2})\b/i) || (text || '').match(/\bages?\s+(\d{1,2})\s*(\+|and up)/i);
+  if (!m) return null;
+  const lo = +m[1], hi = /^\d+$/.test(m[2]) ? +m[2] : null;
+  if (lo > 18 || (hi != null && (hi < lo || hi > 18))) return null;
+  return { label: hi != null ? `${lo}〜${hi}歳（出版社の説明）` : `${lo}歳〜（出版社の説明）`, age: lo };
+}
+
 function mapGoogle(item) {
   const v = item.volumeInfo || {};
   const ids = v.industryIdentifiers || [];
   const isbn = (ids.find((i) => i.type === 'ISBN_13') || ids.find((i) => i.type === 'ISBN_10'))?.identifier || '';
   const cover = (v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '').replace(/^http:/, 'https:') || ndlThumb(isbn);
   const title = [v.title, v.subtitle].filter(Boolean).join(': ');
+  const desc = (v.description || '').slice(0, 2000);
+  // シリーズのレベル（Step into Reading など）→ なければ説明文の「ages 5-8」などの出版社の記載
+  const tg = seriesTarget(title, (v.categories || []).join(' '), desc) || agesFromText(desc);
   return {
     title, author: (v.authors || []).join(', '), isbn, cover,
     lang: v.language === 'ja' || isJapanese(title) ? 'ja' : 'en',
+    tgt: tg?.label || '', tgtAge: tg?.age ?? null,
   };
 }
 
