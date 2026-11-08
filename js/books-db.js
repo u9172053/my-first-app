@@ -1,5 +1,5 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT } from './books-ja.js';
-import { EN_EXACT, EN_EXTRA, EN_PUBLISHED } from './books-en.js';
+import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT } from './books-en.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -207,6 +207,12 @@ export const PRESET_BOOKS = [
   // 名作（Project Gutenberg の全文から数えた実際の語数）
   ...EN_EXACT.filter((r) => !EN_TITLES.has(normTitle(r[0]))).map(([title, author, count, lv, isbn, olCover, pg, rl]) => ({
     pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true, reliable: true,
+  })),
+  // Oxford Reading Tree の各巻（語数つき）。レベルはステージごとの目安
+  ...EN_ORT.map(([title, stage, pack, count]) => ({
+    pid: 'r' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
+    series: `ORT Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
+    lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
   // グレイデッドリーダー（出版社が公表している語数）。学習者向けなので gr にシリーズ・ステージを持たせ、おすすめには出さない
   ...EN_PUBLISHED.map(([title, author, gr, count, lv, isbn, cover]) => ({
