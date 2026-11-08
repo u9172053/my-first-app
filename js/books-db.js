@@ -1,5 +1,5 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT, JA_RAKUTEN } from './books-ja.js';
-import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES } from './books-en.js';
+import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES, EN_BRANCHES } from './books-en.js';
 import { seriesTarget, titleKeys } from './targets.js';
 
 // ============================================================
@@ -215,6 +215,12 @@ const ALL_BOOKS = [
     series: `Oxford Reading Tree (ORT) Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
+  // Scholastic Branches（出版社公表の語数）。リストに同じ本があれば、そちらに語数を付ける（dedupeSeries）
+  ...EN_BRANCHES.map(([title, author, series, num, count, grl]) => ({
+    pid: 'b' + normTitle(series + title), lang: 'en', title, author, series: `${series}${num ? ' #' + num : ''}`,
+    count, exact: true, published: true, reliable: true, classic: true, lbl: `${series} #${num}`,
+    lv: ({ K: 1.6, L: 2.0, M: 2.2, N: 2.5, O: 2.8, P: 3.0 })[grl] ?? 2.4,
+  })),
   // レベル別リーダー（対象年齢はシリーズのレベルから）
   ...EN_SERIES.map(([title, author, lvtxt, isbn, cover]) => {
     const t = seriesTarget(lvtxt);
@@ -268,6 +274,13 @@ function dedupeSeries(list) {
   const seriesByKey = new Map();
   for (const b of list) if (b.pid[0] === 's') for (const k of titleKeys(b.title)) seriesByKey.set(k, b);
   const drop = new Set();
+  const branchByKey = new Map();
+  for (const b of list) if (b.pid[0] === 'b') for (const k of titleKeys(b.title)) branchByKey.set(k, b);
+  for (const b of list) {
+    if (b.pid[0] === 'b' || b.lang !== 'en' || b.count) continue;
+    const hit = titleKeys(b.title).map((k) => branchByKey.get(k)).find(Boolean);
+    if (hit && !drop.has(hit.pid)) { b.count = hit.count; b.exact = true; b.published = true; b.lbl = hit.lbl; drop.add(hit.pid); }
+  }
   for (const b of list) {
     if (b.pid[0] === 's' || b.lang !== 'en') continue;
     if (!b.tgt) {
