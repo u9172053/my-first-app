@@ -35,17 +35,13 @@ function commit() {
 }
 
 // ---------------- 集計 ----------------
-// 「モデル」：見本の5年分の記録。端末にもGoogleドライブにも保存せず、開くたびに同じ内容を作り直す
-const MODEL = { id: 'model', name: 'モデル', emoji: '⭐', model: true };
-let demoLogs = null;
-const modelLogs = () => (demoLogs ||= genModel());
-const children = () => [...state.children.filter((c) => !c.deleted), ...(state.settings.model ? [MODEL] : [])];
+const children = () => state.children.filter((c) => !c.deleted);
 // 表示中の人（「みんな」の合計表示はなくしたので、必ずだれか1人）
 const activeChild = () => {
   const a = state.settings.activeChild;
   return children().some((c) => c.id === a) ? a : children()[0]?.id;
 };
-const logsFor = (cid = activeChild()) => (cid === 'model' ? modelLogs() : state.logs).filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
+const logsFor = (cid = activeChild()) => state.logs.filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
 
 // 文字数・語数が0で記録された本は、リストにある推定値で補う（以前の記録も集計に入るように）
 const PRESET_COUNT = new Map(PRESET_BOOKS.map((b) => [b.pid, b.count]));
@@ -765,7 +761,7 @@ function saveForm(e) {
     count, times: Math.max(1, parseInt($('#fTimes').value, 10) || 1), updatedAt: now,
   };
   if (editing) Object.assign(editing, data);
-  else (data.childId === 'model' ? modelLogs() : state.logs).push({ id: uid(), createdAt: now, ...data });
+  else state.logs.push({ id: uid(), createdAt: now, ...data });
   // 表示月を記録日に合わせる
   const [y, m] = data.date.split('-').map(Number);
   viewY = y; viewM = m - 1;
@@ -852,20 +848,16 @@ function renderSettings() {
     g.innerHTML = `<p class="muted small">ログインすると、あなたのGoogleドライブ（アプリ専用の非公開領域）に自動保存され、スマホとPCで共有できます。サイト運営者からは見えません。</p>
       <button class="btn primary wide" id="gIn">Googleでログイン</button>`;
   }
-  $('#modelBtn').textContent = state.settings.model ? '🗑 モデルケース（見本）を消す' : '⭐ モデルケース（5年分の見本）を表示';
-}
-
-function removeModel() {
-  if (!confirm('モデルケース（見本の記録）を消しますか？')) return;
-  state.settings.model = false; demoLogs = null;
-  if (state.settings.activeChild === 'model') state.settings.activeChild = children()[0]?.id;
-  commit(); renderSettings(); toast('モデルケースを消しました');
+  // モデルケースは1人だけ。追加済みなら、消すときは上の🗑から
+  $('#modelBtn').textContent = '⭐ モデルケース（5歳〜10歳の5年分の見本）を追加';
+  $('#modelBtn').hidden = children().some((c) => c.model);
 }
 
 // ---------------- モデルケース（見本データ）を作る ----------------
 // 5歳から10歳まで5年分（自分で読み始める年齢から）。年齢が上がるにつれて読む本の対象年齢も上がり、
 // ときどき下の年齢向けの本（お気に入りの読み返しなど）もはさむ。
-function genModel() {
+function genModel(childId) {
+  const idp = 'm' + uid();
   let seed = 20211108;
   const rnd = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const pick = (a) => a[Math.floor(rnd() * a.length)];
@@ -889,7 +881,7 @@ function genModel() {
   };
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const start = new Date(end.getFullYear() - 5, end.getMonth(), end.getDate());
-  const logs = []; let n = 0;
+  const logs = []; let n = 0; const now = Date.now();
   const favs = { ja: [], en: [] };
   let enBusy = 0; // 長い本を読んでいる間（1日2,500語くらいのペース）は次の英語の本に進まない
   for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
@@ -903,9 +895,9 @@ function genModel() {
       if (rnd() < 0.15) { favs[lang].push(x); if (favs[lang].length > 12) favs[lang].shift(); }
       const { b, k } = x;
       logs.push({
-        id: 'model' + (++n), childId: 'model', date: ymd(d), lang, title: b.title, author: b.author || '',
+        id: idp + (++n), childId, date: ymd(d), lang, title: b.title, author: b.author || '',
         cover: b.cover || '', isbn: b.isbn || '', pid: b.pid || '', tgt: k.label || '', tgtAge: k.age,
-        count: lang === 'en' ? b.count || 0 : 0, times: 1, updatedAt: 1, demo: true,
+        count: lang === 'en' ? b.count || 0 : 0, times: 1, createdAt: now, updatedAt: now, demo: true,
       });
       if (lang === 'en') enBusy = Math.ceil((b.count || 0) / 2500);
     };
@@ -972,7 +964,7 @@ function bind() {
   $('#dayAdd').onclick = () => { $('#dayDlg').close(); openAdd(dayOpenLast); };
   $('#dayList').onclick = (e) => {
     const it = e.target.closest('[data-log]'); if (!it) return;
-    const log = state.logs.find((l) => l.id === it.dataset.log) || demoLogs?.find((l) => l.id === it.dataset.log);
+    const log = state.logs.find((l) => l.id === it.dataset.log);
     $('#dayDlg').close(); openAdd(log.date, log);
   };
 
@@ -1057,7 +1049,6 @@ function bind() {
     if (!e.target.closest('.del')) return;
     const row = e.target.closest('.child-row');
     const c = children().find((x) => x.id === row.dataset.cid);
-    if (c.model) { removeModel(); return; }
     const n = state.logs.filter((l) => l.childId === c.id && !l.deleted).length;
     if (!confirm(`「${c.name}」を削除しますか？（記録${n}件も削除されます）`)) return;
     const now = Date.now();
@@ -1073,13 +1064,15 @@ function bind() {
     }
   });
   $('#modelBtn').onclick = () => {
-    if (state.settings.model) { removeModel(); return; }
-    state.settings.model = true; demoLogs = null;
-    state.settings.activeChild = 'model'; ageRange = 'all';
+    if (children().some((c) => c.model)) return;
+    const c = { id: 'c' + uid(), name: 'モデル', emoji: '⭐', model: true, updatedAt: Date.now() };
+    const logs = genModel(c.id);
+    state.children.push(c); state.logs.push(...logs);
+    state.settings.activeChild = c.id; ageRange = 'all';
     const r = document.querySelector('input[name=ageRange][value=all]'); if (r) r.checked = true;
     viewY = today.getFullYear(); viewM = today.getMonth();
     commit(); renderSettings(); $('#setDlg').close();
-    toast(`⭐ モデルの記録（${modelLogs().length}件）を表示しています`);
+    toast(`⭐ 「モデル」に5年分の記録（${logs.length}件）を追加しました`);
   };
   $('#ageTabs').addEventListener('change', (e) => { ageRange = e.target.value; renderAgeChart(); });
   $('#exportBtn').onclick = exportData;
