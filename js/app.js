@@ -863,7 +863,7 @@ function removeModel() {
 }
 
 // ---------------- モデルケース（見本データ）を作る ----------------
-// 1歳から6歳まで5年分。年齢が上がるにつれて読む本の対象年齢も上がり、
+// 5歳から10歳まで5年分（自分で読み始める年齢から）。年齢が上がるにつれて読む本の対象年齢も上がり、
 // ときどき下の年齢向けの本（お気に入りの読み返しなど）もはさむ。
 function genModel() {
   let seed = 20211108;
@@ -891,9 +891,10 @@ function genModel() {
   const start = new Date(end.getFullYear() - 5, end.getMonth(), end.getDate());
   const logs = []; let n = 0;
   const favs = { ja: [], en: [] };
+  let enBusy = 0; // 長い本を読んでいる間（1日2,500語くらいのペース）は次の英語の本に進まない
   for (const d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const years = (d - start) / (365.25 * 864e5); // 0〜5
-    const childAge = 1 + years;
+    const childAge = 5 + years;
     const add = (lang, want) => {
       let x;
       if (favs[lang].length && rnd() < 0.12) x = pick(favs[lang]); // お気に入りを読み返す
@@ -906,13 +907,15 @@ function genModel() {
         cover: b.cover || '', isbn: b.isbn || '', pid: b.pid || '', tgt: k.label || '', tgtAge: k.age,
         count: lang === 'en' ? b.count || 0 : 0, times: 1, updatedAt: 1, demo: true,
       });
+      if (lang === 'en') enBusy = Math.ceil((b.count || 0) / 2500);
     };
-    // 日本語：毎日のように1〜2冊
-    if (rnd() < 0.62) { add('ja', childAge - 0.4); if (rnd() < 0.3) add('ja', childAge - 0.4); }
-    // 英語：1歳半ごろから。だんだん読む日が増え、対象年齢は日本語より少しゆっくり上がる
-    if (childAge >= 1.5 && rnd() < 0.25 + years * 0.08) {
-      const want = 1 + (childAge - 1.5) * 0.85;
-      add('en', want); if (childAge > 4 && rnd() < 0.25) add('en', want);
+    // 日本語：毎日のように1冊、ときどき2冊
+    if (rnd() < 0.6) { add('ja', childAge - 0.5); if (rnd() < 0.25) add('ja', childAge - 0.5); }
+    // 英語：だんだん読む日が増え、対象年齢は日本語より少し低めから上がっていく
+    if (enBusy > 0) enBusy--;
+    else if (rnd() < 0.35 + years * 0.07) {
+      const want = 3 + years * 1.05;
+      add('en', want); if (rnd() < 0.2) add('en', want);
     }
   }
   return logs;
