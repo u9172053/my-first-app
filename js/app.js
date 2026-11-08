@@ -238,7 +238,7 @@ function ageData() {
       for (const l of logs) {
         if (l.lang !== lang || !l.date.startsWith(prefix)) continue;
         const b = PRESET_BY_PID.get(l.pid);
-        const a = lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null ? enAgeNum(b.lv) : null);
+        const a = lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null);
         if (a == null) continue; // リストにない本（年齢不明）は除く
         const t = l.times || 1; sum += a * t; n += t;
       }
@@ -430,7 +430,7 @@ function recoCard(b) {
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
-      <div class="age ${b.lang}">${b.lang === 'en' ? enAge(b.lv) : jaAge(b.age) + '（目安）'}</div>
+      <div class="age ${b.lang}">${b.lang === 'en' ? (b.gr || enAge(b.lv)) : jaAge(b.age) + '（目安）'}</div>
       <div class="why">${b.lang === 'en' && b.count ? `<b class="cnt en">${fmt(b.count)}語</b>・` : ''}${esc(b.author || b.series)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
@@ -605,7 +605,7 @@ function itemHtml(b) {
   const n = b.lang === 'en' && b.count ? `${approx}${fmt(b.count)}語` : '';
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
-    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}${b.lang === 'en' && b.lv != null ? '・' + enAge(b.lv) : ''}</div></div>
+    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}${b.lang === 'en' && (b.gr || b.lv != null) ? '・' + (b.gr || enAge(b.lv)) : ''}</div></div>
     <div class="n ${b.lang}">${n}</div></button>`;
 }
 
@@ -638,7 +638,7 @@ function onSearch() {
 }
 
 function pickBook(b) {
-  picked = { title: b.title, author: b.author || '', cover: b.cover || (b.pid ? cachedCover(b.pid) || '' : ''), isbn: b.isbn || '', lang: b.lang || 'en', count: b.count || 0, pid: b.pid || '' };
+  picked = { title: b.title, author: b.author || '', cover: b.cover || (b.pid ? cachedCover(b.pid) || '' : ''), isbn: b.isbn || '', lang: b.lang || 'en', count: b.count || 0, pid: b.pid || '', exact: !!b.exact, published: !!b.published };
   editing = null;
   showForm();
 }
@@ -652,7 +652,7 @@ function showForm() {
   document.querySelector(`input[name=fLang][value=${b.lang}]`).checked = true;
   $('#fWords').value = b.lang === 'en' && b.count ? b.count : '';
   $('#fChars').value = b.lang === 'ja' && b.count ? b.count : '';
-  $('#wordHint').textContent = b.exact ? '（全文から数えた語数）' : '（わかる場合は入力）';
+  $('#wordHint').textContent = b.published ? '（出版社の公表値）' : b.exact ? '（全文から数えた語数）' : '（わかる場合は入力）';
   $('#fDate').value = editing?.date || addDate;
   $('#fTimes').value = editing?.times || 1;
   $('#deleteLog').hidden = !editing;

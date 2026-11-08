@@ -1,5 +1,5 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT } from './books-ja.js';
-import { EN_EXACT, EN_EXTRA } from './books-en.js';
+import { EN_EXACT, EN_EXTRA, EN_PUBLISHED } from './books-en.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -207,6 +207,11 @@ export const PRESET_BOOKS = [
   // 名作（Project Gutenberg の全文から数えた実際の語数）
   ...EN_EXACT.filter((r) => !EN_TITLES.has(normTitle(r[0]))).map(([title, author, count, lv, isbn, olCover, pg, rl]) => ({
     pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true, reliable: true,
+  })),
+  // グレイデッドリーダー（出版社が公表している語数）。学習者向けなので gr にシリーズ・ステージを持たせ、おすすめには出さない
+  ...EN_PUBLISHED.map(([title, author, gr, count, lv, isbn, cover]) => ({
+    pid: 'o' + (isbn || title), lang: 'en', title, author, series: gr, gr, count, lv, isbn, exact: true, published: true,
+    olCover: 0, coverUrl: cover, reliable: !/Bookworms/.test(gr),
   })),
   // 定番作家の作品（語数なし。記録する時に入力できる）
   ...EN_EXTRA.map(([title, author, series, lv, isbn, olCover, rl]) => ({

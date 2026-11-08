@@ -109,6 +109,7 @@ const olCoverUrl = (id) => `https://covers.openlibrary.org/b/id/${id}-M.jpg`;
 
 export function cachedCover(pid) {
   const b = PRESET_BOOKS.find((x) => x.pid === pid);
+  if (b?.coverUrl) return b.coverUrl + (b.isbn ? `|search:${b.pid}` : '');
   if (b?.olCover) return olCoverUrl(b.olCover) + (b.isbn ? `|search:${b.pid}` : '');
   if (b?.coverIsbn) return isbnCoverList(b.coverIsbn, b.pid);
   const v = coverCache[pid];
@@ -196,6 +197,7 @@ export function searchCoverStrict(pid) {
 }
 
 export function fetchPresetCover(book) {
+  if (book.coverUrl) return Promise.resolve(book.coverUrl + (book.isbn ? `|search:${book.pid}` : ''));
   if (book.olCover) return Promise.resolve(olCoverUrl(book.olCover) + (book.isbn ? `|search:${book.pid}` : ''));
   if (book.coverIsbn) return Promise.resolve(isbnCoverList(book.coverIsbn, book.pid));
   const c = cachedCover(book.pid);
