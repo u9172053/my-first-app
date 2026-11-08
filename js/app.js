@@ -629,7 +629,7 @@ function onSearch() {
   if (!q) { itemIdx = 0; renderSearchEmpty(); return; }
   itemIdx = 0;
   const presets = searchPresets(q, 15);
-  const base = presets.length ? '<div class="res-label">📚 登録済みの本（語数つき）</div>' + presets.map(itemHtml).join('') : '';
+  const base = presets.length ? '<div class="res-label">📚 登録済みの本</div>' + presets.map(itemHtml).join('') : '';
   setResults(base + '<div class="res-label">🔎 ほかの本を検索中…</div>', [...presets]);
   searchTimer = setTimeout(async () => {
     searchCtl = new AbortController();

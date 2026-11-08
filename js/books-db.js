@@ -196,7 +196,7 @@ function jaExactFor(title, author) {
 const normTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
 const EXACT_BY_TITLE = new Map(EN_EXACT.map((r) => [normTitle(r[0]), r]));
 const EN_TITLES = new Set(EN.map((r) => normTitle(r[0])));
-export const PRESET_BOOKS = [
+const ALL_BOOKS = [
   // 定番（手で選んだ本）。語数は推定値を使わず、全文から数えた語数がある本だけ持つ
   ...EN.map(([title, author, series, , lv]) => {
     const ex = EXACT_BY_TITLE.get(normTitle(title));
@@ -211,7 +211,7 @@ export const PRESET_BOOKS = [
   // Oxford Reading Tree の各巻（語数つき）。レベルはステージごとの目安
   ...EN_ORT.map(([title, stage, pack, count]) => ({
     pid: 'r' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
-    series: `ORT Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
+    series: `Oxford Reading Tree (ORT) Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
   // グレイデッドリーダー（出版社が公表している語数）。学習者向けなので gr にシリーズ・ステージを持たせ、おすすめには出さない
@@ -244,6 +244,10 @@ export const PRESET_BOOKS = [
     exact: true, reliable: true, classic: true, coverIsbn: '', isbn: '',
   })),
 ];
+
+// 「シリーズ（1冊）」のまとめ項目は、個別の本があり語数の目安も使わなくなったので表示しない
+// （データからは消さない：英語の定番の本のIDは並び順の番号なので、消すと過去の記録がずれるため）
+export const PRESET_BOOKS = ALL_BOOKS.filter((b) => !/1冊/.test(b.title));
 
 
 // 「シリーズ（1冊）」の表紙に使う代表作（表紙の検索にだけ使います）
