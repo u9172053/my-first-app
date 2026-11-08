@@ -11,6 +11,7 @@ import { norm } from './norm.js';
 // ・Scholastic Reader（Scholastic のカタログ）：Level 1＝4〜8歳、Level 2＝6〜8歳
 // ・I Can Read!（出版社は年齢・学年を公表していないため書店の目安）：Level 1＝PreK〜Grade 1、2＝Grade 1〜3、3＝Grade 2〜4、4＝Grade 3〜
 // ・DK Super Readers（DK 公表）：Pre-Level＝3〜5歳
+// ・Itty Bitty Princess Kitty（Little Simon）：5〜9歳（書店の目安）
 const T = (name, lo, hi, src) => ({ label: `${name}：${lo}〜${hi ?? ''}歳（${src}）`, age: lo });
 const SERIES_TARGETS = [
   { re: /step\s*into\s*reading/i, level: /(?:step\s*into\s*reading\s+(?:step\s*)?|step\s*)([1-5])\b/i, map: {
@@ -29,6 +30,8 @@ const SERIES_TARGETS = [
     level1: T('I Can Read! Level 1', 4, 7, '書店の目安'), level2: T('I Can Read! Level 2', 6, 9, '書店の目安'),
     level3: T('I Can Read! Level 3', 7, 10, '書店の目安'), level4: T('I Can Read! Level 4', 8, null, '書店の目安'),
   } },
+  // シリーズ全体で対象年齢が決まっている本（レベル分けのないシリーズ）
+  { re: /itty\s*bitty\s*princess\s*kitty/i, fixed: T('Itty Bitty Princess Kitty', 5, 9, '書店の目安') },
   { re: /dk\s*super\s*readers/i, level: /(pre-?\s*level)\b/i, map: {
     'pre-level': T('DK Super Readers Pre-Level', 3, 5, '出版社の対象'),
   } },
@@ -38,6 +41,7 @@ export function seriesTarget(...texts) {
   const t = texts.filter(Boolean).join(' ');
   for (const s of SERIES_TARGETS) {
     if (!s.re.test(t)) continue;
+    if (s.fixed) return s.fixed;
     const m = t.match(s.level);
     if (!m) continue;
     const key = /^\d$/.test(m[1]) ? m[1] : m[1].toLowerCase().replace(/\s+/g, '').replace(/^pre-?level/, 'pre-level');
