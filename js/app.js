@@ -365,7 +365,7 @@ function dailyJitter(pid) {
 function pickBooks(cands, scoreFn, n, used) {
   const out = [];
   for (const { b, s } of cands.map((b) => ({ b, s: scoreFn(b) })).filter((x) => x.s != null).map((x) => ({ ...x, s: x.s + dailyJitter(x.b.pid) })).sort((x, y) => x.s - y.s)) {
-    const key = b.series || b.pid;
+    const key = b.gr ? b.pid : (b.series || b.pid); // グレイデッドリーダーは同じステージから複数出してよい
     if (used.has(key) || used.has(b.pid)) continue;
     used.add(key); used.add(b.pid); out.push(b);
     if (out.length >= n) break;
@@ -381,11 +381,14 @@ function renderReco() {
   const preset = (l) => PRESET_BOOKS.find((b) => b.pid === l.pid);
   const recentSeries = new Set(recent.map((l) => preset(l)?.series).filter(Boolean));
   // おすすめには、文字数・語数の根拠がある本（実際のページ数や全文から計算できた本）だけを出す
-  const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && b.reliable && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
+  const a = activeChild();
+  const adultMode = a === 'all' ? children().some((c) => c.adult) : !!children().find((c) => c.id === a)?.adult;
+  const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && (b.reliable || (adultMode && b.gr)) && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
   // 表紙が出なかった本は順位を下げる（外しはしない）。表紙が出た本はわずかに優先
   const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
   const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
-    + (b.classic ? 0 : Math.max(0, 0.3 - Math.log10((b.rl || 0) + 1) / 10)); // 定番・人気の本を優先
+    + (b.classic || b.gr ? 0 : Math.max(0, 0.3 - Math.log10((b.rl || 0) + 1) / 10)) // 定番・人気の本を優先
+    + (adultMode && b.gr ? -0.3 : 0); // 大人には学習者向けの本を優先
   const used = new Set();
   let same, up, note;
 
@@ -481,7 +484,7 @@ window.coverNext = (img) => {
   } else img.src = rest[0];
 };
 
-// 対象年齢の目安（英語は英語圏の子ども基準、日本語は文字数から）
+// 対象年齢の目安（英語は英語圏の子どもの年齢、日本語は○歳ごろから）
 function enAge(lv) {
   const t = [[0.5, '1〜3歳'], [1.0, '3〜5歳'], [1.6, '4〜6歳'], [2.4, '5〜7歳'], [3.5, '6〜8歳'], [5.0, '8〜10歳'], [6.5, '9〜12歳']];
   return '英語圏の' + ((t.find(([max]) => lv <= max) || [0, '10歳〜'])[1]) + '向け';
@@ -762,6 +765,7 @@ function renderSettings() {
     <div class="child-row" data-cid="${c.id}">
       <input class="emoji" value="${esc(c.emoji)}" maxlength="4" aria-label="アイコン">
       <input class="name" value="${esc(c.name)}" maxlength="20" aria-label="名前（ニックネーム）">
+      <label class="adult" title="大人の英語学習者"><input type="checkbox" class="is-adult" ${c.adult ? 'checked' : ''}>大人</label>
       ${children().length > 1 ? '<button class="icon-btn del" aria-label="削除">🗑️</button>' : ''}
     </div>`).join('');
   const g = $('#gArea');
@@ -897,7 +901,7 @@ function bind() {
   $('#syncBtn').onclick = () => sync.signIn(getState, setState);
   $('#addChild').onclick = () => {
     const emojis = ['🐰', '🐱', '🐶', '🦁', '🐼', '🐸', '🐥'];
-    state.children.push({ id: 'c' + uid(), name: `子ども${children().length + 1}`, emoji: emojis[children().length % emojis.length], updatedAt: Date.now() });
+    state.children.push({ id: 'c' + uid(), name: `メンバー${children().length + 1}`, emoji: emojis[children().length % emojis.length], updatedAt: Date.now() });
     commit(); renderSettings();
   };
   $('#childList').addEventListener('change', (e) => {
@@ -905,6 +909,7 @@ function bind() {
     const c = state.children.find((x) => x.id === row.dataset.cid);
     c.name = row.querySelector('.name').value.trim() || c.name;
     c.emoji = row.querySelector('.emoji').value.trim() || c.emoji;
+    c.adult = row.querySelector('.is-adult').checked;
     c.updatedAt = Date.now(); commit();
   });
   $('#childList').addEventListener('click', (e) => {
