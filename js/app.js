@@ -901,12 +901,13 @@ function genModel(childId) {
       });
       if (lang === 'en') enBusy = Math.ceil((b.count || 0) / 2500);
     };
-    // 日本語：毎日のように1冊、ときどき2冊
-    if (rnd() < 0.6) { add('ja', childAge - 0.5); if (rnd() < 0.25) add('ja', childAge - 0.5); }
-    // 英語：だんだん読む日が増え、対象年齢は日本語より少し低めから上がっていく
+    // 日本語：毎日のように1冊、ときどき2冊。最初はやさしめで、そこからぐんぐん伸びる
+    const jaWant = 3.8 + years * 1.25;
+    if (rnd() < 0.6) { add('ja', jaWant); if (rnd() < 0.25) add('ja', jaWant); }
+    // 英語：小さいころからのおうち英語で最初は日本語より上。伸びはゆるやかで、2年目ごろに日本語に追い越される
     if (enBusy > 0) enBusy--;
-    else if (rnd() < 0.35 + years * 0.07) {
-      const want = 3 + years * 1.05;
+    else if (rnd() < 0.45 + years * 0.05) {
+      const want = 5 + years * 0.5;
       add('en', want); if (rnd() < 0.2) add('en', want);
     }
   }
