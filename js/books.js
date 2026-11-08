@@ -50,7 +50,7 @@ function mapGoogle(item) {
   const title = [v.title, v.subtitle].filter(Boolean).join(': ');
   const desc = (v.description || '').slice(0, 2000);
   // シリーズのレベル（Step into Reading など）→ なければ説明文の「ages 5-8」などの出版社の記載
-  const tg = seriesTarget(title, (v.categories || []).join(' '), desc) || agesFromText(desc);
+  const tg = seriesTarget(title, (v.authors || []).join(' '), (v.categories || []).join(' '), desc) || agesFromText(desc);
   return {
     title, author: (v.authors || []).join(', '), isbn, cover,
     lang: v.language === 'ja' || isJapanese(title) ? 'ja' : 'en',

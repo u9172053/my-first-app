@@ -284,7 +284,7 @@ function dedupeSeries(list) {
   for (const b of list) {
     if (b.pid[0] === 's' || b.lang !== 'en') continue;
     if (!b.tgt) {
-      const t = seriesTarget(b.title, b.series);
+      const t = seriesTarget(b.title, b.series, b.lbl, b.author);
       if (t) { b.tgt = t.label; b.tgtAge = t.age; }
     }
     const hit = titleKeys(b.title).map((k) => seriesByKey.get(k)).find(Boolean);
