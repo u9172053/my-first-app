@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
+import { norm, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -82,6 +82,7 @@ function render() {
   renderCalendar();
   renderChart();
   renderAgeChart();
+  renderHistory();
   renderReco();
 }
 
@@ -311,6 +312,42 @@ function showAgeTip(e) {
   tip.style.left = `${Math.min(box.width - 110, Math.max(110, r.left - box.left + r.width / 2))}px`;
   tip.style.top = `${r.top - box.top + 12}px`;
   tip.hidden = false;
+}
+
+// ---------------- これまでに読んだ本（一覧・検索） ----------------
+let historyLang = 'all', historyLimit = 30;
+function historyBooks() {
+  // 同じ本（同じ言語・同じタイトル）はまとめて、回数と最後に読んだ日を出す
+  const map = new Map();
+  for (const l of logsFor()) {
+    const key = l.lang + '|' + l.title;
+    const h = map.get(key) || { ...l, times: 0, words: 0, first: l.date, last: l.date };
+    h.times += l.times || 1;
+    h.words += countOf(l) * (l.times || 1);
+    if (l.date > h.last) { h.last = l.date; h.cover = l.cover || h.cover; }
+    if (l.date < h.first) h.first = l.date;
+    map.set(key, h);
+  }
+  return [...map.values()].sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : 0));
+}
+function renderHistory() {
+  const all = historyBooks();
+  $('#historyCount').textContent = all.length ? `${fmt(all.length)}冊` : '';
+  if (!$('#historyCard').open) return; // 開いた時だけ描く
+  const q = norm($('#historySearch').value);
+  const list = all.filter((h) => (historyLang === 'all' || h.lang === historyLang)
+    && (!q || norm(h.title).includes(q) || norm(h.author || '').includes(q)));
+  const md = (d) => { const [, m, dd] = d.split('-'); return `${+m}/${+dd}`; };
+  const shown = list.slice(0, historyLimit);
+  $('#historyList').innerHTML = shown.length ? shown.map((h, i) => `
+    <button class="item" data-h="${i}">
+      <div class="cover">${coverInner(h.cover, h.lang)}</div>
+      <div class="grow"><div class="t"><span class="tag ${h.lang}">${h.lang === 'en' ? '英' : '日'}</span>${esc(h.title)}</div>
+      <div class="a">${h.times}回・最後に読んだ日 ${md(h.last)}${h.lang === 'en' && h.words ? '・' + fmt(h.words) + '語' : ''}</div></div>
+      <div class="n ${h.lang}">もう一度</div></button>`).join('')
+    : `<p class="muted center small">${all.length ? '見つかりませんでした' : 'まだ記録がありません'}</p>`;
+  $('#historyMore').hidden = list.length <= historyLimit;
+  $('#historyList')._items = shown;
 }
 
 // ---------------- おすすめ ----------------
@@ -818,6 +855,22 @@ function bind() {
   $('#ageChart').addEventListener('pointermove', showAgeTip);
   $('#ageChart').addEventListener('click', showAgeTip);
   $('#ageChart').addEventListener('pointerleave', () => { $('#ageTip').hidden = true; $('#ageChart .cross')?.remove(); });
+  $('#historyCard').addEventListener('toggle', renderHistory);
+  $('#historySearch').addEventListener('input', () => { historyLimit = 30; renderHistory(); });
+  $('#historyLang').onclick = (e) => {
+    const b = e.target.closest('[data-l]'); if (!b) return;
+    historyLang = b.dataset.l; historyLimit = 30;
+    $('#historyLang').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    renderHistory();
+  };
+  $('#historyMore').onclick = () => { historyLimit += 30; renderHistory(); };
+  // 一覧の本をタップすると、もう一度読んだ記録として登録画面を開く
+  $('#historyList').onclick = (e) => {
+    const it = e.target.closest('[data-h]'); if (!it) return;
+    const h = $('#historyList')._items[+it.dataset.h];
+    openAdd(todayStr());
+    pickBook({ title: h.title, author: h.author, cover: h.cover, isbn: h.isbn, lang: h.lang, count: h.lang === 'en' ? h.count : 0, pid: h.pid, exact: !!PRESET_BY_PID.get(h.pid)?.exact });
+  };
   $('#chartTabs').addEventListener('change', (e) => { chartMode = e.target.value; renderChart(); });
   $('#enChart').addEventListener('pointermove', showChartTip);
   $('#enChart').addEventListener('click', showChartTip);

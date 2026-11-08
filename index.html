@@ -99,6 +99,18 @@
     <div id="recoUp" class="reco-list"></div>
   </section>
 
+  <details class="card history" id="historyCard">
+    <summary><span>📚 これまでに読んだ本</span><span class="muted small" id="historyCount"></span></summary>
+    <div class="history-tools">
+      <input id="historySearch" type="search" placeholder="タイトル・著者で検索" autocomplete="off">
+      <div class="chips" id="historyLang">
+        <button type="button" data-l="all" class="on">すべて</button><button type="button" data-l="ja">日本語</button><button type="button" data-l="en">英語</button>
+      </div>
+    </div>
+    <div id="historyList" class="results"></div>
+    <button id="historyMore" class="btn ghost wide" hidden>もっと見る</button>
+  </details>
+
   <footer class="foot">
     <p>🔒 記録はこの端末（とログインした場合はあなたのGoogleドライブ）だけに保存されます。サイト運営者には送信されません。</p>
     <p>※「約」が付いた語数・文字数は推定です。表紙・書誌情報：openBD / Google Books / Open Library、名作の語数：Project Gutenberg の全文から計測</p>
