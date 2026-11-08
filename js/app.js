@@ -388,7 +388,7 @@ function renderReco() {
   const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
   const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
     + (b.classic || b.gr ? 0 : Math.max(0, 0.3 - Math.log10((b.rl || 0) + 1) / 10)) // 定番・人気の本を優先
-    + (adultMode && b.gr ? -0.3 : 0); // 大人には学習者向けの本を優先
+    ;
   const used = new Set();
   let same, up, note;
 
@@ -396,8 +396,17 @@ function renderReco() {
     const levels = recent.map((l) => preset(l)?.lv ?? estimateLevel(l.count)).filter((v) => v != null);
     const avg = levels.length ? levels.reduce((s, v) => s + v, 0) / levels.length : null;
     const base = avg ?? 0.3;
-    same = pickBooks(cands, (b) => (Math.abs(b.lv - base) <= 0.5 ? Math.abs(b.lv - base) + bonus(b) : null), 4, used);
-    up = pickBooks(cands, (b) => (b.lv > base + 0.2 && b.lv <= base + 1.5 ? Math.abs(b.lv - (base + 0.7)) + bonus(b) : null), 4, used);
+    const sameScore = (b) => (Math.abs(b.lv - base) <= 0.5 ? Math.abs(b.lv - base) + bonus(b) : null);
+    const upScore = (b) => (b.lv > base + 0.2 && b.lv <= base + 1.5 ? Math.abs(b.lv - (base + 0.7)) + bonus(b) : null);
+    if (adultMode) {
+      // 大人：学習者向けの本2冊＋子ども向けの本2冊ずつ（レベル的に子どもの本を読みたい人もいるので両方出す）
+      const learner = cands.filter((b) => b.gr), kids = cands.filter((b) => !b.gr);
+      same = [...pickBooks(learner, sameScore, 2, used), ...pickBooks(kids, sameScore, 2, used)];
+      up = [...pickBooks(learner, upScore, 2, used), ...pickBooks(kids, upScore, 2, used)];
+    } else {
+      same = pickBooks(cands, sameScore, 4, used);
+      up = pickBooks(cands, upScore, 4, used);
+    }
     // 足りない時は条件をゆるめて補う
     if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.lv - base), 4 - same.length, used));
     if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.lv > base ? b.lv - base : null), 4 - up.length, used));
