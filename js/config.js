@@ -20,9 +20,9 @@ export const CONFIG = {
   googleBooksApiKey: 'AIzaSyDHE8aSxDB8LH90qnJnuRZF3Lf_AUTGwAg',
 
   // Amazon アソシエイトのトラッキングID（例: 'ouchieigo-22'）
-  amazonTag: '',
+  amazonTag: 'u9172053-22',
   // 楽天アフィリエイトID（例: '1a2b3c4d.5e6f7a8b.1a2b3c4d.5e6f7a8b'）
-  rakutenAffiliateId: '',
+  rakutenAffiliateId: '16c5e5c6.51eed2fb.16c5e5c7.a39556bb',
 
   hashtags: ['おうち英語', '多読', 'おうち英語の解体新書'],
 };
