@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
+import { norm, titleKeys, shareTargets, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -635,7 +635,7 @@ function onSearch() {
   searchTimer = setTimeout(async () => {
     searchCtl = new AbortController();
     try {
-      const web = await searchGoogleBooks(q, searchCtl.signal);
+      const web = shareTargets(await searchGoogleBooks(q, searchCtl.signal));
       const seen = new Set(presets.map((p) => p.title.toLowerCase()));
       const extra = web.filter((b) => !seen.has(b.title.toLowerCase())).map((b) => {
         const p = findPresetByTitle(b.title);
@@ -960,7 +960,25 @@ function autoHeight() {
   post();
 }
 
+// リスト外の英語の本で、出版社の対象がまだ分からない記録は、別の版から対象を探して補う（1回あたり数冊まで）
+async function backfillTargets() {
+  const todo = state.logs.filter((l) => !l.deleted && l.lang === 'en' && !l.pid && !l.tgt && !l.tgtChecked).slice(0, 5);
+  let changed = false;
+  for (const l of todo) {
+    try {
+      const core = l.title.replace(/[（(][^）)]*[）)]/g, ' ').split(/[:：]/).pop().trim() || l.title;
+      const list = shareTargets([{ ...l, tgt: '' }, ...(await searchGoogleBooks(`intitle:${core}`))]);
+      const keys = new Set(titleKeys(l.title));
+      const hit = list.find((b) => b.tgt && titleKeys(b.title).some((k) => keys.has(k)));
+      if (hit) { l.tgt = hit.tgt; l.tgtAge = hit.tgtAge; }
+      l.tgtChecked = true; l.updatedAt = Date.now(); changed = true;
+    } catch { break; } // 通信できない時は次回に回す
+  }
+  if (changed) commit();
+}
+
 bind();
 render();
+setTimeout(backfillTargets, 1500);
 updateSyncUi(sync.linked ? 'stale' : 'off');
 autoHeight();

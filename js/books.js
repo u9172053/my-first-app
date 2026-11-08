@@ -79,6 +79,26 @@ export function agesFromText(text) {
   return { label: hi != null ? `${lo}〜${hi}歳（出版社の説明）` : `${lo}歳〜（出版社の説明）`, age: lo };
 }
 
+// 同じ本の別の版を見分けるためのキー（かっこ書きを除いた全体と、「：」の後の書名部分）
+export function titleKeys(title) {
+  const base = (title || '').replace(/[（(][^）)]*[）)]/g, ' ');
+  const keys = new Set([norm(base)]);
+  const last = norm(base.split(/[:：]/).pop()); // 「シリーズ名: 書名」の書名の部分
+  if (last.length >= 6) keys.add(last);
+  return [...keys].filter(Boolean);
+}
+// 検索結果の中で、対象が分かっている版から、分からない版へ対象を引き継ぐ
+export function shareTargets(list) {
+  const known = new Map();
+  for (const b of list) if (b.tgt) for (const k of titleKeys(b.title)) known.set(k, b);
+  for (const b of list) {
+    if (b.tgt || b.lang !== 'en') continue;
+    const hit = titleKeys(b.title).map((k) => known.get(k)).find(Boolean);
+    if (hit) { b.tgt = hit.tgt; b.tgtAge = hit.tgtAge; }
+  }
+  return list;
+}
+
 function mapGoogle(item) {
   const v = item.volumeInfo || {};
   const ids = v.industryIdentifiers || [];
