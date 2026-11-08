@@ -1,5 +1,6 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT } from './books-ja.js';
-import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT } from './books-en.js';
+import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES } from './books-en.js';
+import { seriesTarget, titleKeys } from './targets.js';
 
 // ============================================================
 //  人気の本プリセット
@@ -214,6 +215,15 @@ const ALL_BOOKS = [
     series: `Oxford Reading Tree (ORT) Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
+  // レベル別リーダー（対象年齢はシリーズのレベルから）
+  ...EN_SERIES.map(([title, author, lvtxt, isbn, cover]) => {
+    const t = seriesTarget(lvtxt);
+    return {
+      pid: 's' + (isbn || normTitle(title)), lang: 'en', title, author, series: lvtxt, count: 0, isbn, coverUrl: cover,
+      tgt: t?.label || '', tgtAge: t?.age ?? null, reliable: true, rl: 5,
+      lv: t ? ({ 3: 0.4, 4: 0.6, 5: 0.9, 6: 1.4, 7: 2.0, 8: 2.6 })[t.age] ?? 1.0 : 1.0,
+    };
+  }),
   // グレイデッドリーダー（出版社が公表している語数）。学習者向けなので gr にシリーズ・ステージを持たせ、おすすめには出さない
   ...EN_PUBLISHED.map(([title, author, gr, count, lv, isbn, cover]) => ({
     pid: 'o' + (isbn || title), lang: 'en', title, author, series: gr, gr, count, lv, isbn, exact: true, published: true,
@@ -247,7 +257,28 @@ const ALL_BOOKS = [
 
 // 「シリーズ（1冊）」のまとめ項目は、個別の本があり語数の目安も使わなくなったので表示しない
 // （データからは消さない：英語の定番の本のIDは並び順の番号なので、消すと過去の記録がずれるため）
-export const PRESET_BOOKS = ALL_BOOKS.filter((b) => !/1冊/.test(b.title));
+export const PRESET_BOOKS = dedupeSeries(ALL_BOOKS.filter((b) => !/1冊/.test(b.title)));
+
+// ・タイトルや説明に「Step into Reading Step 1」などがある本には、シリーズのレベルの対象年齢を付ける
+// ・レベル別リーダーの一覧と同じ本がすでにある場合は、一覧の方を外して既存の本に対象年齢を付ける
+function dedupeSeries(list) {
+  const seriesByKey = new Map();
+  for (const b of list) if (b.pid[0] === 's') for (const k of titleKeys(b.title)) seriesByKey.set(k, b);
+  const drop = new Set();
+  for (const b of list) {
+    if (b.pid[0] === 's' || b.lang !== 'en') continue;
+    if (!b.tgt) {
+      const t = seriesTarget(b.title, b.series);
+      if (t) { b.tgt = t.label; b.tgtAge = t.age; }
+    }
+    const hit = titleKeys(b.title).map((k) => seriesByKey.get(k)).find(Boolean);
+    if (hit) {
+      if (!b.tgt) { b.tgt = hit.tgt; b.tgtAge = hit.tgtAge; }
+      drop.add(hit.pid);
+    }
+  }
+  return list.filter((b) => !drop.has(b.pid));
+}
 
 
 // 「シリーズ（1冊）」の表紙に使う代表作（表紙の検索にだけ使います）

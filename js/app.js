@@ -36,10 +36,10 @@ function commit() {
 
 // ---------------- 集計 ----------------
 const children = () => state.children.filter((c) => !c.deleted);
+// 表示中の人（「みんな」の合計表示はなくしたので、必ずだれか1人）
 const activeChild = () => {
   const a = state.settings.activeChild;
-  if (a !== 'all' && !children().some((c) => c.id === a)) return children().length === 1 ? children()[0].id : 'all';
-  return children().length === 1 ? children()[0].id : a;
+  return children().some((c) => c.id === a) ? a : children()[0]?.id;
 };
 const logsFor = (cid = activeChild()) => state.logs.filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
 
@@ -91,8 +91,7 @@ function renderTabs() {
   const el = $('#childTabs');
   if (cs.length <= 1) { el.innerHTML = ''; return; }
   const a = activeChild();
-  el.innerHTML = `<button data-c="all" class="${a === 'all' ? 'on' : ''}">👨‍👩‍👧 みんな</button>` +
-    cs.map((c) => `<button data-c="${c.id}" class="${a === c.id ? 'on' : ''}">${esc(c.emoji)} ${esc(c.name)}</button>`).join('');
+  el.innerHTML = cs.map((c) => `<button data-c="${c.id}" class="${a === c.id ? 'on' : ''}">${esc(c.emoji)} ${esc(c.name)}</button>`).join('');
 }
 
 function renderStats() {
@@ -238,7 +237,7 @@ function ageData() {
       for (const l of logs) {
         if (l.lang !== lang || !l.date.startsWith(prefix)) continue;
         const b = PRESET_BY_PID.get(l.pid);
-        const a = l.tgtAge != null ? l.tgtAge
+        const a = l.tgtAge != null ? l.tgtAge : b?.tgtAge != null ? b.tgtAge
           : lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null);
         if (a == null) continue; // リストにない本（年齢不明）は除く
         const t = l.times || 1; sum += a * t; n += t;
@@ -443,7 +442,7 @@ function recoCard(b) {
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       <div class="t">${esc(b.title)}</div>
-      <div class="age ${b.lang}">${b.lang === 'en' ? (b.gr || b.lbl || enAge(b.lv)) : jaAge(b.age) + '（目安）'}</div>
+      <div class="age ${b.lang}">${b.tgt ? esc(b.tgt) : b.lang === 'en' ? (b.gr || b.lbl || enAge(b.lv)) : jaAge(b.age) + '（目安）'}</div>
       <div class="why">${b.lang === 'en' && b.count ? `<b class="cnt en">${fmt(b.count)}語</b>・` : ''}${esc(b.author || b.series)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
