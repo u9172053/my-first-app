@@ -225,92 +225,95 @@ const jaAgeNum = (a) => (a <= 7 ? a : a === 8 ? 8 : 10);
 const enAgeNum = (lv) => ([[0.5, 1], [1.0, 3], [1.6, 4], [2.4, 5], [3.5, 6], [5.0, 8], [6.5, 9]].find(([m]) => lv <= m) || [0, 10])[1];
 const PRESET_BY_PID = new Map(PRESET_BOOKS.map((b) => [b.pid, b]));
 
+// 1冊ごとの対象年齢（記録の年齢 → リストの本の年齢 → 目安の順）
+function logAge(l) {
+  const b = PRESET_BY_PID.get(l.pid);
+  if (l.tgtAge != null) return l.tgtAge;
+  if (b?.tgtAge != null) return b.tgtAge;
+  if (l.lang === 'ja') return b?.age != null ? jaAgeNum(b.age) : null;
+  return b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null;
+}
+
+// 表示している月までの12か月分の記録を、1冊ずつ点にする
 function ageData() {
-  const logs = logsFor();
-  const months = [];
-  for (let k = 11; k >= 0; k--) {
-    const d = new Date(viewY, viewM - k, 1);
-    const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-    const row = { label: `${d.getMonth() + 1}月`, full: `${d.getFullYear()}年${d.getMonth() + 1}月` };
-    for (const lang of ['ja', 'en']) {
-      let sum = 0, n = 0;
-      for (const l of logs) {
-        if (l.lang !== lang || !l.date.startsWith(prefix)) continue;
-        const b = PRESET_BY_PID.get(l.pid);
-        const a = l.tgtAge != null ? l.tgtAge : b?.tgtAge != null ? b.tgtAge
-          : lang === 'ja' ? (b?.age != null ? jaAgeNum(b.age) : null) : (b?.lv != null && !/Bookworms/.test(b.gr || '') ? enAgeNum(b.lv) : null);
-        if (a == null) continue; // リストにない本（年齢不明）は除く
-        const t = l.times || 1; sum += a * t; n += t;
-      }
-      row[lang] = n ? sum / n : null;
-    }
-    months.push(row);
-  }
-  return months;
+  const start = new Date(viewY, viewM - 11, 1), end = new Date(viewY, viewM + 1, 1);
+  const s0 = ymd(start), s1 = ymd(end);
+  const pts = logsFor().filter((l) => l.date >= s0 && l.date < s1)
+    .map((l) => ({ l, age: logAge(l) })).filter((p) => p.age != null)
+    .sort((a, b) => (a.l.date < b.l.date ? -1 : a.l.date > b.l.date ? 1 : 0));
+  return { start, end, pts };
 }
 
 function renderAgeChart() {
-  const data = ageData();
-  const W = 340, H = 170, L = 30, R = 34, T = 12, B = 22;
-  const vals = data.flatMap((d) => [d.ja, d.en]).filter((v) => v != null);
-  const max = Math.max(6, Math.ceil((Math.max(0, ...vals) + 1) / 2) * 2);
-  const slot = (W - L - R) / data.length;
-  const x = (i) => L + slot * i + slot / 2;
+  const { start, end, pts } = ageData();
+  const W = 340, H = 130, L = 30, R = 10, T = 8, B = 20;
+  const maxAge = Math.max(6, ...pts.map((p) => p.age));
+  const max = Math.ceil((maxAge + 1) / 2) * 2;
+  const span = end - start;
+  const x = (date) => L + (W - L - R) * ((new Date(date) - start) / span);
   const y = (v) => T + (H - T - B) * (1 - v / max);
-  const ageTxt = (v) => `${+v.toFixed(1)}歳〜`;
   let svg = '';
   const step = max <= 6 ? 2 : max <= 12 ? 4 : 6;
-  for (let t = 0; t <= max; t += step) {
-    svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${t}歳</text>`;
+  for (let t = 0; t <= max; t += step) svg += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${t}歳</text>`;
+  for (let k = 0; k < 12; k += 2) {
+    const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
+    svg += `<text class="axis" x="${x(d) + 4}" y="${H - 5}">${d.getMonth() + 1}月</text>`;
   }
-  data.forEach((d, i) => { svg += `<text class="axis" x="${x(i)}" y="${H - 6}" text-anchor="middle">${d.label}</text>`; });
-  const ends = [];
+  // 直近8冊の平均の線（上がっていく様子を見やすくする）
   for (const lang of ['ja', 'en']) {
-    // データのない月で線を切る
-    let path = '', pen = false, last = -1;
-    data.forEach((d, i) => {
-      if (d[lang] == null) { pen = false; return; }
-      path += `${pen ? 'L' : 'M'}${x(i)},${y(d[lang])} `; pen = true; last = i;
-    });
-    if (path) svg += `<path class="line ${lang}" d="${path}"/>`;
-    data.forEach((d, i) => {
-      if (d[lang] == null) return;
-      svg += lang === 'ja'
-        ? `<circle class="pt ja" cx="${x(i)}" cy="${y(d.ja)}" r="5"/>`
-        : `<rect class="pt en" x="${x(i) - 5}" y="${y(d.en) - 5}" width="10" height="10" rx="2"/>`;
-    });
-    if (last >= 0) ends.push({ lang, i: last, v: data[last][lang] });
+    const ps = pts.filter((p) => p.l.lang === lang);
+    if (ps.length < 3) continue;
+    const line = ps.map((p, i) => {
+      const w = ps.slice(Math.max(0, i - 7), i + 1);
+      return `${i ? 'L' : 'M'}${x(p.l.date).toFixed(1)},${y(w.reduce((s, q) => s + q.age, 0) / w.length).toFixed(1)}`;
+    }).join(' ');
+    svg += `<path class="trend ${lang}" d="${line}"/>`;
   }
-  // 最新の点にだけ数値（線の端）。2つが近い時は上下にずらして重ならないように
-  if (ends.length === 2 && Math.abs(y(ends[0].v) - y(ends[1].v)) < 14) {
-    const [hi, lo] = ends[0].v >= ends[1].v ? [ends[0], ends[1]] : [ends[1], ends[0]];
-    hi.dy = -8; lo.dy = 12;
+  // 1冊ずつの点（同じ日・同じ年齢の点は少し横にずらす）
+  const seen = new Map();
+  const drawn = pts.map((p) => {
+    const key = p.l.date + p.l.lang + p.age;
+    const n = seen.get(key) || 0; seen.set(key, n + 1);
+    const cx = x(p.l.date) + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 4, cy = y(p.age);
+    return { ...p, cx, cy };
+  });
+  for (const d of drawn) {
+    svg += d.l.lang === 'ja'
+      ? `<circle class="dot ja" cx="${d.cx.toFixed(1)}" cy="${d.cy.toFixed(1)}" r="3.5"/>`
+      : `<rect class="dot en" x="${(d.cx - 3.5).toFixed(1)}" y="${(d.cy - 3.5).toFixed(1)}" width="7" height="7" rx="1.5"/>`;
   }
-  for (const e of ends) svg += `<text class="end" x="${x(e.i) + 9}" y="${y(e.v) + (e.dy ?? 4)}">${ageTxt(e.v)}</text>`;
-  data.forEach((d, i) => { svg += `<rect class="hit" data-i="${i}" x="${L + slot * i}" y="${T}" width="${slot}" height="${H - T - B}"/>`; });
   const el = $('#ageChart');
   el.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  el.setAttribute('aria-label', '読んでいる本の対象年齢の推移（日本語・英語）');
-  el.innerHTML = svg || '';
-  el._data = data; el._geo = { x, T, H, B };
+  el.setAttribute('aria-label', `読んだ本の対象年齢。${pts.length}冊`);
+  el.innerHTML = svg;
+  el._pts = drawn;
   $('#ageTip').hidden = true;
-  const cell = (v) => (v == null ? '—' : ageTxt(v));
-  $('#ageTable').innerHTML = `<table><tr><th>月</th><th>日本語</th><th>英語</th></tr>${data.map((d) => `<tr><td>${d.full}</td><td>${cell(d.ja)}</td><td>${cell(d.en)}</td></tr>`).join('')}</table>`;
+  $('#ageEmpty').hidden = pts.length > 0;
+  // 表：月ごとの平均
+  const rows = [];
+  for (let k = 0; k < 12; k++) {
+    const d = new Date(start.getFullYear(), start.getMonth() + k, 1);
+    const pre = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    const avg = (lang) => { const a = pts.filter((p) => p.l.lang === lang && p.l.date.startsWith(pre)); return a.length ? `${+(a.reduce((s, p) => s + p.age, 0) / a.length).toFixed(1)}歳〜（${a.length}冊）` : '—'; };
+    rows.push(`<tr><td>${d.getFullYear()}年${d.getMonth() + 1}月</td><td>${avg('ja')}</td><td>${avg('en')}</td></tr>`);
+  }
+  $('#ageTable').innerHTML = `<table><tr><th>月（平均）</th><th>日本語</th><th>英語</th></tr>${rows.join('')}</table>`;
 }
 
+// 点をタップ（またはなぞる）と、いちばん近い本の名前と対象年齢を出す
 function showAgeTip(e) {
-  const hit = e.target.closest('.hit');
-  const tip = $('#ageTip'), el = $('#ageChart');
-  el.querySelector('.cross')?.remove();
-  if (!hit) { tip.hidden = true; return; }
-  const i = +hit.dataset.i, d = el._data[i], g = el._geo;
-  if (d.ja == null && d.en == null) { tip.hidden = true; return; }
-  el.insertAdjacentHTML('afterbegin', `<line class="cross" x1="${g.x(i)}" x2="${g.x(i)}" y1="${g.T}" y2="${g.H - g.B}"/>`);
-  const f = (v) => (v == null ? 'なし' : `${+v.toFixed(1)}歳〜`);
-  tip.textContent = `${d.full}　日本語 ${f(d.ja)}／英語 ${f(d.en)}`;
-  const box = el.getBoundingClientRect(), r = hit.getBoundingClientRect();
-  tip.style.left = `${Math.min(box.width - 110, Math.max(110, r.left - box.left + r.width / 2))}px`;
-  tip.style.top = `${r.top - box.top + 12}px`;
+  const el = $('#ageChart'), tip = $('#ageTip');
+  const box = el.getBoundingClientRect();
+  if (!el._pts?.length || !box.width) { tip.hidden = true; return; }
+  const sx = 340 / box.width;
+  const px = (e.clientX - box.left) * sx, py = (e.clientY - box.top) * sx;
+  let best = null, bd = 14 * 14;
+  for (const p of el._pts) { const d = (p.cx - px) ** 2 + (p.cy - py) ** 2; if (d < bd) { bd = d; best = p; } }
+  if (!best) { tip.hidden = true; return; }
+  const [, m, dd] = best.l.date.split('-');
+  tip.textContent = `${+m}/${+dd}　${best.l.title.slice(0, 24)}（${+best.age.toFixed(1)}歳〜）`;
+  tip.style.left = `${Math.min(box.width - 120, Math.max(120, best.cx / sx))}px`;
+  tip.style.top = `${best.cy / sx - 6}px`;
   tip.hidden = false;
 }
 

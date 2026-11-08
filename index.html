@@ -65,10 +65,11 @@
 
   <section class="card chart-card">
     <div class="sec-head"><h2>🎂 読んでいる本の対象年齢</h2></div>
-    <p class="chart-sum">月ごとに、読んだ本の対象年齢（○歳から向け）の平均を表示します。英語は英語圏の子どもの年齢です。</p>
+    <p class="chart-sum">読んだ本1冊ごとの対象年齢（○歳から向け）を点で表示します。線は直近8冊の平均です。</p>
     <div class="legend-row"><span class="lg ja"><i class="mk circle"></i>日本語</span><span class="lg en"><i class="mk square"></i>英語</span></div>
     <div class="chart-wrap" id="ageWrap">
       <svg id="ageChart" role="img"></svg>
+      <p class="muted small center" id="ageEmpty" hidden>対象年齢が分かる本を記録すると、ここに点が増えていきます</p>
       <div class="chart-tip" id="ageTip" hidden></div>
     </div>
     <details class="chart-table"><summary>表で見る</summary><div id="ageTable"></div></details>

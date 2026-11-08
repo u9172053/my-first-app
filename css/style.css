@@ -121,7 +121,13 @@ h1, h2, h3, h4 { margin: 0; line-height: 1.3; }
 #ageChart .pt.ja { fill: var(--ja); }
 #ageChart .pt.en { fill: var(--en); }
 #ageChart .end { fill: var(--ink); font-size: 10px; font-weight: 800; }
-#ageChart .hit { fill: transparent; cursor: pointer; }
+#ageChart .dot { stroke: var(--card); stroke-width: 1; opacity: .85; }
+#ageChart .dot.ja { fill: var(--ja); }
+#ageChart .dot.en { fill: var(--en); }
+#ageChart .trend { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .55; }
+#ageChart .trend.ja { stroke: var(--ja); }
+#ageChart .trend.en { stroke: var(--en); }
+#ageChart { cursor: pointer; }
 #ageChart .cross { stroke: var(--sub); stroke-width: 1; stroke-dasharray: 3 3; }
 .legend-row { display: flex; gap: 14px; font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
 .legend-row .lg { display: inline-flex; align-items: center; gap: 5px; }
