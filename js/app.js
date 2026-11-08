@@ -617,7 +617,7 @@ function itemHtml(b) {
   const n = b.lang === 'en' && b.count ? `${approx}${fmt(b.count)}語` : '';
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
-    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null ? '・' + jaAge(b.age) : ''}${b.tgt ? '・' + esc(b.tgt) : b.lang === 'en' && (b.gr || b.lbl || b.lv != null) ? '・' + (b.gr || b.lbl || enAge(b.lv)) : ''}</div></div>
+    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null && !b.tgt ? '・' + jaAge(b.age) : ''}${b.tgt ? '・' + esc(b.tgt) : b.lang === 'en' && (b.gr || b.lbl || b.lv != null) ? '・' + (b.gr || b.lbl || enAge(b.lv)) : ''}</div></div>
     <div class="n ${b.lang}">${n}</div></button>`;
 }
 

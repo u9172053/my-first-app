@@ -1,4 +1,4 @@
-import { JA_BOOKS, JA_CLASSICS, JA_EXACT } from './books-ja.js';
+import { JA_BOOKS, JA_CLASSICS, JA_EXACT, JA_RAKUTEN } from './books-ja.js';
 import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES } from './books-en.js';
 import { seriesTarget, titleKeys } from './targets.js';
 
@@ -239,7 +239,10 @@ const ALL_BOOKS = [
     // 文字数は推定せず、全文から数えた実際の文字数（青空文庫の同じ作者の同じ作品）がある時だけ持つ
     const ex = jaExactFor(title, author);
     const chars = ex ? ex[4] : 0;
+    const rk = JA_RAKUTEN[isbn]; // 楽天ブックスの対象年齢・商品ページ
+    const rkAge = rk && rk[0] != null ? { tgt: `${rk[0]}〜${rk[1] ?? ''}歳（楽天ブックスの目安）`, tgtAge: rk[0] } : {};
     return {
+      ...rkAge, rkUrl: rk?.[2] || '',
       exact: !!ex,
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）

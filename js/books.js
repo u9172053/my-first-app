@@ -258,6 +258,11 @@ export function amazonUrl(book) {
 }
 
 export function rakutenUrl(book) {
+  if (book.rkUrl) { // 楽天ブックスの商品ページが分かっている本は、そのページへのアフィリエイトリンク
+    if (!CONFIG.rakutenAffiliateId) return book.rkUrl;
+    const u = encodeURIComponent(book.rkUrl);
+    return `https://hb.afl.rakuten.co.jp/hgc/${CONFIG.rakutenAffiliateId}/?pc=${u}&m=${u}`;
+  }
   const q = book.isbn || `${book.title.replace(/[（(].*?[)）]/g, '')} ${book.author || ''}`.trim();
   const target = `https://books.rakuten.co.jp/search?sitem=${encodeURIComponent(q)}`;
   if (!CONFIG.rakutenAffiliateId) return target;
