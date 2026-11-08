@@ -34,7 +34,7 @@ const SERIES_TARGETS = [
   // 出版社が公表：Branches 5〜8歳（Scholastic）、Magic Tree House 6〜9歳、Geronimo Stilton 7〜10歳（Scholastic）、
   //   Captain Underpants 7歳〜（Scholastic）、Boxcar Children 6〜8歳、Ivy + Bean 6〜9歳（Chronicle）
   // 書店・紹介サイトの目安：Diary of a Wimpy Kid 8〜12歳、Elephant & Piggie 3〜8歳、Junie B. Jones・Mercy Watson・A to Z Mysteries 6〜9歳、
-  //   Judy Moody 6〜10歳、Princess in Black 5〜8歳、Itty Bitty Princess Kitty 5〜9歳、Biscuit 4〜8歳
+  //   Judy Moody 6〜10歳、Princess in Black 5〜8歳、Itty Bitty Princess Kitty 5〜9歳、Biscuit 3〜5歳
   { re: /owl\s*diaries|unicorn\s*diaries|dragon\s*masters|press\s*start!?|diary\s*of\s*a\s*pug|hilde\s*cracks|branches\s*book|scholastic\s*branches|tracey\s*west|rebecca\s*elliott/i, fixed: T('Branches', 5, 8, '出版社の対象') },
   { re: /magic\s*tree\s*house|mary\s*pope\s*osborne/i, fixed: T('Magic Tree House', 6, 9, '出版社の対象') },
   { re: /geronimo\s*stilton|thea\s*stilton/i, fixed: T('Geronimo Stilton', 7, 10, '出版社の対象') },
@@ -49,7 +49,7 @@ const SERIES_TARGETS = [
   { re: /judy\s*moody|megan\s*mcdonald/i, fixed: T('Judy Moody', 6, 10, '書店などの目安') },
   { re: /princess\s*in\s*black/i, fixed: T('The Princess in Black', 5, 8, '書店などの目安') },
   { re: /itty\s*bitty\s*princess\s*kitty/i, fixed: T('Itty Bitty Princess Kitty', 5, 9, '書店などの目安') },
-  { re: /\bbiscuit\b|alyssa\s*satin\s*capucilli/i, fixed: T('Biscuit', 4, 8, '書店などの目安') },
+  { re: /\bbiscuit\b|alyssa\s*satin\s*capucilli/i, fixed: T('Biscuit', 3, 5, '書店などの目安') }, // 書店の各巻の表記（Biscuit Finds a Friend 3〜5歳）。4〜8歳は I Can Read! 全体の表記なので使わない
   { re: /dk\s*super\s*readers/i, level: /(pre-?\s*level)\b/i, map: {
     'pre-level': T('DK Super Readers Pre-Level', 3, 5, '出版社の対象'),
   } },
