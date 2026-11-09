@@ -685,7 +685,11 @@ function setResults(html, books) {
   $('#searchResults').innerHTML = html;
   $('#searchResults').querySelectorAll('.item').forEach((el) => {
     const b = resultBooks[+el.dataset.i];
-    if (b?.pid && !b.cover) loadCoverInto(b, el.querySelector('.cover'));
+    if (!b?.pid || b.cover) return;
+    // 一覧を描き直したときも、取得済みの表紙はそのまま出す（描き直しで消えないように）
+    const c = cachedCover(b.pid);
+    if (c) { if (!el.querySelector('.cover img')) el.querySelector('.cover').innerHTML = coverInner(c, b.lang); }
+    else loadCoverInto(b, el.querySelector('.cover'));
   });
 }
 
