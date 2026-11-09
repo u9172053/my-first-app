@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -385,7 +385,7 @@ function renderHistory() {
   const shown = list.slice(0, historyLimit);
   $('#historyList').innerHTML = shown.length ? shown.map((h, i) => `
     <button class="item" data-h="${i}">
-      <div class="cover">${coverInner(h.cover, h.lang)}</div>
+      <div class="cover">${coverInner(withIsbnCovers(h.cover, h.isbn), h.lang)}</div>
       <div class="grow"><div class="t"><span class="tag ${h.lang}">${h.lang === 'en' ? '英' : '日'}</span>${esc(h.title)}</div>
       <div class="a">${h.times}回・最後に読んだ日 ${md(h.last)}${h.lang === 'en' && h.words ? '・' + fmt(h.words) + '語' : ''}</div></div>
       <div class="n ${h.lang}">もう一度</div></button>`).join('')
@@ -628,7 +628,7 @@ function renderDay() {
     const cnt = countOf(l);
     const n = l.lang === 'en' ? (cnt ? `${fmt(cnt * t)}語` : '') : `${t}冊`;
     return `<button class="item" data-log="${l.id}">
-      <div class="cover">${coverInner(l.cover, l.lang)}</div>
+      <div class="cover">${coverInner(withIsbnCovers(l.cover, l.isbn), l.lang)}</div>
       <div class="grow"><div class="t"><span class="tag ${l.lang}">${l.lang === 'en' ? '英' : '日'}</span>${esc(l.title)}</div>
       <div class="a">${c ? esc(c.emoji + ' ' + c.name) + '・' : ''}${t > 1 ? t + '回読んだ・' : ''}タップで編集</div></div>
       <div class="n ${l.lang}">${n}</div></button>`;
@@ -691,7 +691,7 @@ function setResults(html, books) {
 let itemIdx = 0;
 function itemHtml(b) {
   const i = itemIdx++;
-  const cover = b.cover || (b.pid ? cachedCover(b.pid) : '');
+  const cover = b.cover || (b.pid ? cachedCover(b.pid) : '') || withIsbnCovers('', b.isbn);
   const approx = b.pid && !b.exact ? '約' : '';
   const n = b.lang === 'en' && b.count ? `${approx}${fmt(b.count)}語` : '';
   return `<button class="item" data-i="${i}">
@@ -738,7 +738,7 @@ function showForm() {
   const b = picked;
   $('#addTitle').textContent = editing ? '記録を編集' : '読んだ本を記録';
   $('#addSearchView').hidden = true; $('#bookForm').hidden = false;
-  $('#formCover').innerHTML = coverInner(b.cover, b.lang);
+  $('#formCover').innerHTML = coverInner(withIsbnCovers(b.cover, b.isbn), b.lang);
   $('#fTitle').value = b.title; $('#fAuthor').value = b.author || '';
   const fl = langMode() === 'both' ? b.lang : langMode();
   document.querySelector(`input[name=fLang][value=${fl}]`).checked = true;
@@ -845,7 +845,9 @@ async function openScan() {
         return;
       }
       const p = findPresetByTitle(b.title);
-      pickBook(p ? { ...b, count: p.count, pid: p.pid, lang: p.lang, cover: b.cover } : b);
+      // リストにある本なら、リストの表紙（取得済み）を先頭に
+      const pc = p ? cachedCover(p.pid) : '';
+      pickBook(p ? { ...b, count: p.count, pid: p.pid, lang: p.lang, cover: withIsbnCovers([pc, b.cover].filter(Boolean).join('|'), isbn) } : b);
     });
   } catch (e) {
     $('#scanMsg').textContent = 'カメラを使えませんでした。ブラウザの設定でカメラを許可してください。';

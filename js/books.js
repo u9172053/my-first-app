@@ -35,6 +35,17 @@ export function findPresetByTitle(title) {
 }
 
 // 国立国会図書館サーチの書影（日本の本向け。画像がなければ表示側で代わりのアイコンに切り替え）
+// ISBNが分かる本の表紙候補をつなげる（先頭から順に試し、読めない・極小の画像なら次へ）
+// 版元ドットコム(openBD) → 国立国会図書館 → Open Library（Google Books は検索で表紙が分かったときだけ先頭に入る）
+export function withIsbnCovers(cover, isbn) {
+  const list = String(cover || '').split('|').filter(Boolean);
+  if (/^97[89]\d{10}$/.test(isbn || '')) {
+    list.push(`https://cover.openbd.jp/${isbn}.jpg`, `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`,
+      `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`);
+  }
+  return [...new Set(list)].join('|');
+}
+
 const ndlThumb = (isbn) => (/^97[89]\d{10}$/.test(isbn || '') ? `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg` : '');
 
 const isJapanese = (s = '') => /[぀-ヿ一-鿿]/.test(s);
@@ -76,12 +87,16 @@ export async function lookupIsbn(isbn) {
     const j = await r.json();
     const s = j?.[0]?.summary;
     if (s?.title) {
-      return { title: s.title, author: (s.author || '').replace(/／著.*$/, ''), isbn, cover: s.cover || ndlThumb(isbn), lang: isJapanese(s.title) ? 'ja' : 'en' };
+      // openBD に表紙がない本は、Google Books の表紙を先頭に足す
+      let g = '';
+      if (!s.cover) { try { g = (await searchGoogleBooks(`isbn:${isbn}`))[0]?.cover || ''; } catch { /* なくてもOK */ } }
+      if (g.includes('ndlsearch')) g = '';
+      return { title: s.title, author: (s.author || '').replace(/／著.*$/, ''), isbn, cover: withIsbnCovers(s.cover || g, isbn), lang: isJapanese(s.title) ? 'ja' : 'en' };
     }
   } catch { /* 次へ */ }
   try {
     const list = await searchGoogleBooks(`isbn:${isbn}`);
-    if (list.length) return { ...list[0], isbn };
+    if (list.length) return { ...list[0], isbn, cover: withIsbnCovers(list[0].cover, isbn) };
   } catch { /* 次へ */ }
   try {
     const r = await fetch(`https://openlibrary.org/search.json?isbn=${isbn}&limit=1&fields=title,author_name,cover_i,language`);
@@ -89,7 +104,7 @@ export async function lookupIsbn(isbn) {
     if (d?.title) {
       return {
         title: d.title, author: (d.author_name || []).join(', '), isbn,
-        cover: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '',
+        cover: withIsbnCovers(d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '', isbn),
         lang: (d.language || []).includes('jpn') || isJapanese(d.title) ? 'ja' : 'en',
       };
     }
