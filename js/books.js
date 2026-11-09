@@ -56,6 +56,27 @@ export function searchPub(q, n = 10) {
   return hits.slice(0, n).map((r) => ({ title: r.title, author: r.author, isbn: r.isbn, lang: 'ja', tgt: r.label, tgtAge: r.age, cover: '' }));
 }
 
+// ---------------- 洋書の語数リスト（日本多読学会の語数リストのうち、本のリストにない本） ----------------
+// data/en-lib.json：[ISBN, 書名, シリーズ, 語数, YL下, YL上, 対象年齢, 表記]。必要になったときだけ読み込む
+let enRows = null, enByIsbn = new Map(), enLoading = null;
+export function loadEnLib() {
+  if (enRows) return Promise.resolve(enRows);
+  return (enLoading ||= fetch(new URL('../data/en-lib.json', import.meta.url)).then((r) => r.json()).then((rows) => {
+    enRows = rows.map(([isbn, title, series, count, y0, y1, age, label]) => ({ isbn, title, series, count, yl: [y0, y1], age, label, key: norm(title) }));
+    enByIsbn = new Map(enRows.map((r) => [r.isbn, r]));
+    return enRows;
+  }).catch(() => { enLoading = null; return []; }));
+}
+const enBook = (r) => ({ title: r.title, author: '', series: r.series, isbn: r.isbn, lang: 'en', count: r.count, exact: true, tgt: r.label || '', tgtAge: r.age, lbl: r.series, cover: '' });
+export const enLibBook = (isbn) => { const r = enByIsbn.get(isbn); return r ? enBook(r) : null; };
+export function searchEnLib(q, n = 15) {
+  if (!enRows) return [];
+  const k = norm(q); if (k.length < 2) return [];
+  const hits = enRows.filter((r) => r.key.includes(k) || norm(r.series).includes(k));
+  hits.sort((a, b) => (a.key.startsWith(k) ? 0 : 1) - (b.key.startsWith(k) ? 0 : 1) || a.key.length - b.key.length);
+  return hits.slice(0, n).map(enBook);
+}
+
 // ISBNが分かる本の表紙候補をつなげる（先頭から順に試し、読めない・極小の画像なら次へ）
 // 版元ドットコム(openBD) → 国立国会図書館 → Open Library（Google Books は検索で表紙が分かったときだけ先頭に入る）
 export function withIsbnCovers(cover, isbn) {

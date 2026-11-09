@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -638,7 +638,7 @@ function renderDay() {
 // ---------------- 追加ダイアログ ----------------
 let addDate = null;
 function openAdd(date = null, log = null) {
-  loadPubAges(); // 検索・記録で使う出版社の対象年齢を先に読み込んでおく
+  loadPubAges(); loadEnLib(); // 検索・記録で使う出版社の対象年齢・洋書の語数リストを先に読み込んでおく
   editing = log;
   addDate = date || (log?.date) || todayStr();
   $('#searchInput').value = '';
@@ -718,6 +718,7 @@ function onSearch() {
     const have = new Set(presets.map((b) => b.isbn).filter(Boolean)), haveT = new Set(presets.map((b) => norm(b.title)));
     presets.push(...searchPub(q, 10).filter((b) => !have.has(b.isbn) && !haveT.has(norm(b.title))));
   }
+  if (langOk('en')) presets.push(...searchEnLib(q, 15)); // 洋書の語数リスト（本のリストと重ならない本だけが入っている）
   const base = presets.length ? '<div class="res-label">📚 登録済みの本</div>' + presets.map(itemHtml).join('') : '';
   setResults(base + '<div class="res-label">🔎 ほかの本を検索中…</div>', [...presets]);
   searchTimer = setTimeout(async () => {
@@ -854,14 +855,21 @@ async function openScan() {
   try {
     await scanner.start(async (isbn) => {
       $('#scanMsg').textContent = `ISBN ${isbn} を検索中…`;
-      const b = await lookupIsbn(isbn);
+      const [b0] = await Promise.all([lookupIsbn(isbn), loadEnLib()]);
+      // ネットの書誌で見つからなくても、本のリストか洋書の語数リストにISBNがあればその本にする
+      const known = PRESET_BOOKS.find((x) => x.isbn === isbn) || enLibBook(isbn);
+      const b = b0 || (known ? { title: known.title, author: known.author || '', isbn, lang: known.lang, cover: withIsbnCovers('', isbn) } : null);
       $('#scanDlg').close();
       if (!b) {
         toast('本が見つかりませんでした。手入力してください');
         pickBook({ title: '', isbn, lang: 'en' });
         return;
       }
-      const p = findPresetByTitle(b.title);
+      // ISBNで本のリスト → 洋書の語数リストの順に探し、なければ書名で探す
+      await loadEnLib();
+      const p = PRESET_BOOKS.find((x) => x.isbn === isbn) || findPresetByTitle(b.title);
+      const lib = !p && enLibBook(isbn);
+      if (lib) { pickBook({ ...b, ...lib, title: lib.title || b.title, cover: withIsbnCovers(b.cover, isbn) }); return; }
       // リストにある本なら、リストの表紙（取得済み）を先頭に
       const pc = p ? cachedCover(p.pid) : '';
       pickBook(p ? { ...b, count: p.count, pid: p.pid, lang: p.lang, cover: withIsbnCovers([pc, b.cover].filter(Boolean).join('|'), isbn) } : b);
@@ -1182,6 +1190,13 @@ async function backfillTargets() {
     if (pa && (l.tgtAge == null || !/（[^）]*(?:書店|社|館)）$/.test(l.tgt || '')) && l.tgt !== pa.label) {
       l.tgt = pa.label; l.tgtAge = pa.age; l.updatedAt = Date.now(); pubFilled = true;
     }
+  }
+  // 洋書：ISBNが分かる記録で語数が0のものに、洋書の語数リストの語数を入れる（自分で入れた語数はそのまま）
+  await loadEnLib();
+  for (const l of state.logs) {
+    if (l.deleted || l.lang !== 'en' || l.count || !l.isbn) continue;
+    const lib = enLibBook(l.isbn) || PRESET_BOOKS.find((x) => x.isbn === l.isbn && x.count);
+    if (lib?.count) { l.count = lib.count; l.updatedAt = Date.now(); pubFilled = true; }
   }
   if (pubFilled) commit();
   // 以前の学年表記（「小1〜小3」など）で保存した対象を、年齢表記に直す

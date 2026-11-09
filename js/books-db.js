@@ -1,5 +1,6 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT, JA_RAKUTEN } from './books-ja.js';
 import { JA_PUB } from './books-ja-pub.js';
+import { EN_LIB_FILL } from './books-en-lib.js';
 import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES, EN_BRANCHES, EN_ORT_DD } from './books-en.js';
 import { seriesTarget, titleKeys } from './targets.js';
 
@@ -290,6 +291,15 @@ const ALL_BOOKS = [
 // 「シリーズ（1冊）」のまとめ項目は、個別の本があり語数の目安も使わなくなったので表示しない
 // （データからは消さない：英語の定番の本のIDは並び順の番号なので、消すと過去の記録がずれるため）
 export const PRESET_BOOKS = dedupeSeries(ALL_BOOKS.filter((b) => !/1冊/.test(b.title)));
+// 語数がまだない本に、日本多読学会の語数リストの値（とISBN）を補う
+for (const b of PRESET_BOOKS) {
+  const f = EN_LIB_FILL[b.pid];
+  if (!f) continue;
+  if (f[2] != null && b.tgtAge == null) { b.tgt = f[3]; b.tgtAge = f[2]; }
+  if (b.count || !f[0]) continue;
+  b.count = f[0]; b.exact = true; b.wordSrc = 'jera';
+  if (f[1] && !b.isbn) b.isbn = f[1];
+}
 
 // ・タイトルや説明に「Step into Reading Step 1」などがある本には、シリーズのレベルの対象年齢を付ける
 // ・レベル別リーダーの一覧と同じ本がすでにある場合は、一覧の方を外して既存の本に対象年齢を付ける
