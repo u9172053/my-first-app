@@ -280,3 +280,14 @@ label input { margin-top: 3px; color: var(--ink); font-weight: 400; font-size: 1
   .reco-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .day { min-height: 72px; font-size: 11px; }
 }
+
+/* 「日本語だけ」「英語だけ」の設定：もう片方の表示を隠す */
+body[data-only=ja] .en-only, body[data-only=en] .ja-only,
+body[data-only=ja] .stat.en, body[data-only=en] .stat.ja,
+body[data-only=ja] #monthSum .en, body[data-only=en] #monthSum .ja,
+body[data-only=ja] .both-only, body[data-only=en] .both-only { display: none !important; }
+.lang-mode span { padding: 10px 4px; font-size: 13px; }
+.lang-mode input:checked + span { border-color: var(--accent, #5bb48c); background: #eaf6ef; color: #2f7a55; font-weight: 700; }
+.btn.mercari { background: #ff333f; color: #fff; border-color: #ff333f; font-size: 12px; padding: 6px 4px; }
+.reco .links { gap: 4px; }
+.reco .links .btn { padding-left: 2px; padding-right: 2px; white-space: nowrap; }

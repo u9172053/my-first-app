@@ -3,7 +3,7 @@
 // ============================================================
 import { CONFIG } from './config.js';
 
-const FONT = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif';
+const FONT = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", "Meiryo", sans-serif';
 const C = { bg: '#fff8ee', card: '#ffffff', ink: '#3b2f2a', sub: '#8a7a70', en: '#2f7fd8', ja: '#ee8a2a', line: '#f0e2d0', accent: '#5bb48c' };
 const fmt = (n) => Math.round(n).toLocaleString('ja-JP');
 
@@ -38,8 +38,8 @@ export async function renderShareImage(canvas, d) {
   ctx.fillText(head, W / 2, 200);
 
   // 日本語カード（左）と英語カード（右）
-  const cw = (W - 160 - 30) / 2;
-  const card = (x, color, label, num, unit, sub) => {
+  const cw2 = (W - 160 - 30) / 2;
+  const card = (x, color, label, num, unit, sub, cw = cw2) => {
     roundRect(ctx, x, 250, cw, 330, 36); ctx.fillStyle = C.card; ctx.fill();
     const cx = x + cw / 2;
     ctx.textAlign = 'center'; ctx.fillStyle = color; ctx.font = `700 38px ${FONT}`; ctx.fillText(label, cx, 315);
@@ -50,8 +50,13 @@ export async function renderShareImage(canvas, d) {
     ctx.textAlign = 'left'; ctx.font = `800 44px ${FONT}`; ctx.fillText(unit, cx - 22 + nw / 2 + 8, 450);
     ctx.textAlign = 'center'; ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`; ctx.fillText(sub, cx, 525);
   };
-  card(80, C.ja, 'にほんご', fmt(d.jaBooks), '冊', `累計 ${fmt(d.totalJa)}冊`);
-  card(80 + cw + 30, C.en, 'English', fmt(d.enWords), '語', `累計 ${fmt(d.totalEn)}語`);
+  // 「日本語だけ」「英語だけ」の設定なら、その言語のカードを横いっぱいに
+  if (d.only === 'ja') card(80, C.ja, 'にほんご', fmt(d.jaBooks), '冊', `累計 ${fmt(d.totalJa)}冊`, W - 160);
+  else if (d.only === 'en') card(80, C.en, 'English', fmt(d.enWords), '語', `累計 ${fmt(d.totalEn)}語`, W - 160);
+  else {
+    card(80, C.ja, 'にほんご', fmt(d.jaBooks), '冊', `累計 ${fmt(d.totalJa)}冊`);
+    card(80 + cw2 + 30, C.en, 'English', fmt(d.enWords), '語', `累計 ${fmt(d.totalEn)}語`);
+  }
 
   // ミニカレンダー（週の数に合わせて行の高さを調整）
   const first = new Date(d.year, d.month - 1, 1).getDay();

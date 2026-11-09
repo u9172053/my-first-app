@@ -23,6 +23,8 @@ export const CONFIG = {
   amazonTag: 'u9172053-22',
   // 楽天アフィリエイトID（例: '1a2b3c4d.5e6f7a8b.1a2b3c4d.5e6f7a8b'）
   rakutenAffiliateId: '16c5e5c6.51eed2fb.16c5e5c7.a39556bb',
+  // メルカリアンバサダーのID（共有リンクの afid=○○ の数字）
+  mercariAfid: '9184954178',
 
   hashtags: ['おうち英語', '多読', 'おうち英語の解体新書'],
 };

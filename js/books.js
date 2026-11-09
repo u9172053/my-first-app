@@ -257,6 +257,13 @@ export function amazonUrl(book) {
   return `https://www.amazon.co.jp/s?k=${q}${tag ? '&' + tag : ''}`;
 }
 
+// メルカリ：タイトルで検索した結果ページ（メルカリアンバサダーのIDを付ける）
+export function mercariUrl(book) {
+  const q = book.title.replace(/[（(].*?[)）]/g, '').replace(/[#＃]\s*\d+\s*/g, ' ').trim();
+  const id = CONFIG.mercariAfid ? `&afid=${encodeURIComponent(CONFIG.mercariAfid)}` : '';
+  return `https://jp.mercari.com/search?keyword=${encodeURIComponent(q)}${id}`;
+}
+
 export function rakutenUrl(book) {
   if (book.rkUrl) { // 楽天ブックスの商品ページが分かっている本は、そのページへのアフィリエイトリンク
     if (!CONFIG.rakutenAffiliateId) return book.rkUrl;

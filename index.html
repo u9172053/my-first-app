@@ -44,13 +44,13 @@
       <h2 id="monthLabel"></h2>
       <button id="nextMonth" class="icon-btn" aria-label="次の月">›</button>
     </div>
-    <div class="legend"><span class="dot ja"></span>日本語（冊）<span class="dot en"></span>英語（語）</div>
+    <div class="legend"><span class="ja-only"><span class="dot ja"></span>日本語（冊）</span><span class="en-only"><span class="dot en"></span>英語（語）</span></div>
     <div class="cal-grid cal-week"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
     <div id="calGrid" class="cal-grid"></div>
     <div class="month-sum" id="monthSum"></div>
   </section>
 
-  <section class="card chart-card">
+  <section class="card chart-card en-only" id="enChartCard">
     <div class="sec-head"><h2>📈 英語の語数</h2></div>
     <div class="seg chart-tabs" id="chartTabs" role="radiogroup" aria-label="グラフの単位">
       <label><input type="radio" name="chartMode" value="month" checked><span>月ごと（12か月）</span></label>
@@ -71,7 +71,7 @@
       <label><input type="radio" name="ageRange" value="all"><span>これまで全部</span></label>
     </div>
     <p class="chart-sum">読んだ本1冊ごとの対象年齢（○歳から向け）を点で表示します。線は直近の平均です。</p>
-    <div class="legend-row"><span class="lg ja"><i class="mk circle"></i>日本語</span><span class="lg en"><i class="mk square"></i>英語</span></div>
+    <div class="legend-row"><span class="lg ja ja-only"><i class="mk circle"></i>日本語</span><span class="lg en en-only"><i class="mk square"></i>英語</span></div>
     <div class="chart-wrap" id="ageWrap">
       <svg id="ageChart" role="img"></svg>
       <p class="muted small center" id="ageEmpty" hidden>対象年齢が分かる本を記録すると、ここに点が増えていきます</p>
@@ -94,7 +94,7 @@
     <div class="sec-head">
       <h2>📖 つぎのおすすめ</h2><span class="pr">PR</span>
     </div>
-    <div class="seg reco-tabs" id="recoTabs">
+    <div class="seg reco-tabs both-only" id="recoTabs">
       <label><input type="radio" name="recoLang" value="ja" checked><span>🇯🇵 日本語の絵本</span></label>
       <label><input type="radio" name="recoLang" value="en"><span>🇬🇧 英語の本</span></label>
     </div>
@@ -109,7 +109,7 @@
     <summary><span>📚 これまでに読んだ本</span><span class="muted small" id="historyCount"></span></summary>
     <div class="history-tools">
       <input id="historySearch" type="search" placeholder="タイトル・著者で検索" autocomplete="off">
-      <div class="chips" id="historyLang">
+      <div class="chips both-only" id="historyLang">
         <button type="button" data-l="all" class="on">すべて</button><button type="button" data-l="ja">日本語</button><button type="button" data-l="en">英語</button>
       </div>
     </div>
@@ -148,7 +148,7 @@
         <label>著者<input id="fAuthor"></label>
       </div>
     </div>
-    <div class="seg" role="radiogroup">
+    <div class="seg both-only" role="radiogroup">
       <label><input type="radio" name="fLang" value="ja"><span>🇯🇵 日本語</span></label>
       <label><input type="radio" name="fLang" value="en" checked><span>🇬🇧 英語</span></label>
     </div>
@@ -225,6 +225,14 @@
   <div id="childList" class="child-list"></div>
   <button id="addChild" class="btn wide">＋ 読む人を追加</button>
   <button id="modelBtn" class="btn ghost wide mt"></button>
+
+  <h4>📖 記録する本</h4>
+  <p class="muted small">「英語は読まない」「英語の多読だけ記録したい」ときは片方だけにすると、もう片方の記録や機能が表示されなくなります（記録は消えません）。</p>
+  <div class="seg lang-mode" id="langModeSeg" role="radiogroup" aria-label="記録する本">
+    <label><input type="radio" name="langMode" value="both" checked><span>日本語と英語</span></label>
+    <label><input type="radio" name="langMode" value="ja"><span>日本語だけ</span></label>
+    <label><input type="radio" name="langMode" value="en"><span>英語だけ</span></label>
+  </div>
 
   <h4 id="gHead">☁️ Googleアカウントで保存</h4>
   <div id="gArea"></div>

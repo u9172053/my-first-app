@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -41,7 +41,10 @@ const activeChild = () => {
   const a = state.settings.activeChild;
   return children().some((c) => c.id === a) ? a : children()[0]?.id;
 };
-const logsFor = (cid = activeChild()) => state.logs.filter((l) => !l.deleted && (cid === 'all' || l.childId === cid));
+// 記録する言語：'both'（日本語と英語）/'ja'（日本語だけ）/'en'（英語だけ）。片方だけなら、もう片方の記録や機能は見せない
+const langMode = () => state.settings.langMode || 'both';
+const langOk = (lang) => langMode() === 'both' || lang === langMode();
+const logsFor = (cid = activeChild()) => state.logs.filter((l) => !l.deleted && (cid === 'all' || l.childId === cid) && langOk(l.lang));
 
 // 文字数・語数が0で記録された本は、リストにある推定値で補う（以前の記録も集計に入るように）
 const PRESET_COUNT = new Map(PRESET_BOOKS.map((b) => [b.pid, b.count]));
@@ -76,7 +79,18 @@ function streak(logs) {
 }
 
 // ---------------- 描画 ----------------
+function applyLangMode() {
+  const m = langMode();
+  document.body.dataset.only = m === 'both' ? '' : m;
+  if (m !== 'both') {
+    recoLang = m;
+    const r = document.querySelector(`input[name=recoLang][value=${m}]`); if (r) r.checked = true;
+  }
+  const s = document.querySelector(`input[name=langMode][value=${m}]`); if (s) s.checked = true;
+}
+
 function render() {
+  applyLangMode();
   renderTabs();
   renderStats();
   renderCalendar();
@@ -116,7 +130,7 @@ function renderStats() {
     card('en', '英語の累計', all.en, '語', all.enBooks);
 }
 
-const shortNum = (n) => n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '万' : fmt(n);
+const shortNum = (n) => n >= 10000 ? (n / 10000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '') + '万' : String(Math.round(n || 0)); // マスに収まるようカンマなし
 
 function renderCalendar() {
   $('#monthLabel').textContent = `${viewY}年 ${viewM + 1}月`;
@@ -477,6 +491,7 @@ function recoCard(b) {
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
         <a class="btn rakuten" href="${esc(rakutenUrl(b))}" target="_blank" rel="noopener sponsored">楽天</a>
+        <a class="btn mercari" href="${esc(mercariUrl(b))}" target="_blank" rel="noopener sponsored">メルカリ</a>
       </div>
     </div>`;
 }
@@ -619,7 +634,7 @@ function renderSearchEmpty() {
     if (recent.length >= 8) break;
   }
   const popular = ['はらぺこあおむし', 'ぐりとぐら', 'だるまさんが', 'Oxford Reading Tree Stage 1+（1冊）', 'Brown Bear, Brown Bear, What Do You See?', 'The Very Hungry Caterpillar', 'Elephant & Piggie（1冊・平均）', 'Frog and Toad Are Friends', 'Magic Tree House #1 Dinosaurs Before Dark']
-    .map((t) => PRESET_BOOKS.find((b) => b.title === t)).filter(Boolean);
+    .map((t) => PRESET_BOOKS.find((b) => b.title === t)).filter((b) => b && langOk(b.lang));
   let html = '';
   if (recent.length) {
     html += '<div class="res-label">🔁 最近読んだ本（もう一度読んだ時に）</div>' +
@@ -658,7 +673,7 @@ function onSearch() {
   searchCtl?.abort();
   if (!q) { itemIdx = 0; renderSearchEmpty(); return; }
   itemIdx = 0;
-  const presets = searchPresets(q, 15);
+  const presets = searchPresets(q, 30).filter((b) => langOk(b.lang)).slice(0, 15);
   const base = presets.length ? '<div class="res-label">📚 登録済みの本</div>' + presets.map(itemHtml).join('') : '';
   setResults(base + '<div class="res-label">🔎 ほかの本を検索中…</div>', [...presets]);
   searchTimer = setTimeout(async () => {
@@ -669,7 +684,7 @@ function onSearch() {
       const extra = web.filter((b) => !seen.has(b.title.toLowerCase())).map((b) => {
         const p = findPresetByTitle(b.title);
         return p ? { ...b, count: p.count, pid: p.pid, lang: p.lang } : b;
-      });
+      }).filter((b) => langOk(b.lang));
       itemIdx = presets.length;
       const html = base + (extra.length ? '<div class="res-label">🔎 その他の本（語数は手入力）</div>' + extra.map(itemHtml).join('') : (presets.length ? '' : '<p class="muted center">見つかりませんでした。手入力で登録できます。</p>'));
       setResults(html, [...presets, ...extra]);
@@ -691,7 +706,8 @@ function showForm() {
   $('#addSearchView').hidden = true; $('#bookForm').hidden = false;
   $('#formCover').innerHTML = coverInner(b.cover, b.lang);
   $('#fTitle').value = b.title; $('#fAuthor').value = b.author || '';
-  document.querySelector(`input[name=fLang][value=${b.lang}]`).checked = true;
+  const fl = langMode() === 'both' ? b.lang : langMode();
+  document.querySelector(`input[name=fLang][value=${fl}]`).checked = true;
   $('#fWords').value = b.lang === 'en' && b.count ? b.count : '';
   $('#fChars').value = b.lang === 'ja' && b.count ? b.count : '';
   $('#wordHint').textContent = b.published ? '（出版社の公表値）' : b.exact ? '' : '（わかる場合は入力）';
@@ -817,12 +833,15 @@ function shareData() {
   for (const [date, ls] of byDay(mLogs)) days.set(+date.slice(8), aggregate(ls));
   const a = activeChild();
   const name = $('#shareName').checked && a !== 'all' ? children().find((c) => c.id === a)?.name : '';
-  return { year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days };
+  return { only: langMode() === 'both' ? '' : langMode(), year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days };
 }
 async function drawShare() {
   const d = shareData();
   await renderShareImage($('#shareCanvas'), d);
-  const text = `${d.month}月の読書きろく：日本語 ${fmt(d.jaBooks)}冊、英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）📚\n#${CONFIG.hashtags.join(' #')}`;
+  const body = d.only === 'ja' ? `日本語 ${fmt(d.jaBooks)}冊（累計 ${fmt(d.totalJa)}冊）`
+    : d.only === 'en' ? `英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`
+    : `日本語 ${fmt(d.jaBooks)}冊、英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`;
+  const text = `${d.month}月の読書きろく：${body}📚\n#${CONFIG.hashtags.join(' #')}`;
   $('#shareX').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(CONFIG.shareUrl)}`;
   $('#shareLine').href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(CONFIG.shareUrl)}&text=${encodeURIComponent(text)}`;
   $('#shareNative').dataset.text = text;
@@ -1075,6 +1094,10 @@ function bind() {
     commit(); renderSettings(); $('#setDlg').close();
     toast(`⭐ 「モデル」に5年分の記録（${logs.length}件）を追加しました`);
   };
+  $('#langModeSeg').addEventListener('change', (e) => {
+    state.settings.langMode = e.target.value; commit();
+    toast(e.target.value === 'ja' ? '日本語だけ表示します' : e.target.value === 'en' ? '英語だけ表示します' : '日本語と英語を表示します');
+  });
   $('#ageTabs').addEventListener('change', (e) => { ageRange = e.target.value; renderAgeChart(); });
   $('#exportBtn').onclick = exportData;
   $('#importFile').onchange = (e) => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; };
