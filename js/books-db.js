@@ -1,6 +1,6 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT, JA_RAKUTEN } from './books-ja.js';
 import { JA_PUB } from './books-ja-pub.js';
-import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES, EN_BRANCHES } from './books-en.js';
+import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES, EN_BRANCHES, EN_ORT_DD } from './books-en.js';
 import { seriesTarget, titleKeys } from './targets.js';
 
 // ============================================================
@@ -224,6 +224,12 @@ const ALL_BOOKS = [
     pid: 'r' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
     series: `Oxford Reading Tree (ORT) Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
     ...ortTarget(stage),
+    lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
+  })),
+  ...EN_ORT_DD.map(([title, stage, pack]) => ({
+    pid: 'rd' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
+    series: `Oxford Reading Tree (ORT) Decode and Develop Level ${stage} ${pack}`.trim(), lbl: `ORT Decode and Develop Level ${stage}`,
+    count: 0, reliable: true, ...ortTarget(stage),
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
   // Scholastic Branches（出版社公表の語数）。リストに同じ本があれば、そちらに語数を付ける（dedupeSeries）
