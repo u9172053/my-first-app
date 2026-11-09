@@ -1535,7 +1535,7 @@ export const EN_ORT = [
   ['The Dragon Dance', '4', 'More Stories B', 192, '9780198482260'],
   ['Everyone Got Wet', '4', 'More Stories B', 200, '9780198482284'],
   ['Dad\'s Jacket', '4', 'More Stories C', 151, '9780198482369'],
-  ['Stuck in the Mud', '4', 'More Stories C', 129, '9780198482376'], // 1129 は元の一覧の誤記（多治見市の一覧で129）
+  ['Stuck in the Mud', '4', 'More Stories C', 129, '9780198482376'], // 1129 は元の一覧の誤記（多治見市・袋井市の一覧で129）
   ['The Den', '4', 'More Stories C', 140, '9780198482383'],
   ['Look Smart', '4', 'More Stories C', 187, '9780198482390'],
   ['Tug of War', '4', 'More Stories C', 161, '9780198482352'],
@@ -1644,7 +1644,15 @@ export const EN_ORT = [
   ["Kipper's Birthday", "2", "", 64],
   ["A Sinking Feeling", "2", "", 57],
   ["The Balloon", "4", "", 177],
-  ["The Little Queen", "9", "", 1452],=1&zoom=1&source=gbs_api'],
+  ["The Little Queen", "9", "", 1452],
+];
+
+// レベル別リーダー（Step into Reading・Ready-to-Read・Scholastic Reader・I Can Read!）
+// 書名・説明文にシリーズ名とレベルが明記されている本だけ。対象年齢はレベルから決める（targets.js）
+// [タイトル, 著者, シリーズとレベル, ISBN, 表紙URL]
+export const EN_SERIES = [
+  ['Panda Kisses', 'Alyssa Satin Capucilli', 'Step into Reading Step 1', '9788925657233', ''],
+  ['Old, New, Red, Blue!', 'RH Disney', 'Step into Reading Step 1', '9780736424103', 'https://books.google.com/books/content?id=bwzt8D6f3ckC&printsec=frontcover&img=1&zoom=1&source=gbs_api'],
   ['Best Dad In the Sea', 'RH Disney', 'Step into Reading Step 1', '9780736421317', 'https://books.google.com/books/content?id=ISbOd4o9XOQC&printsec=frontcover&img=1&zoom=1&source=gbs_api'],
   ['Bubble Power!.', 'Josephine Nagaraj', 'Step into Reading Step 2', '9780553520910', ''],
   ['Disney/Pixar Gatto', 'RH Disney', 'Step into Reading Step 2', '9780736491112', ''],
