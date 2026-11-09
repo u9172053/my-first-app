@@ -195,6 +195,15 @@ function jaExactFor(title, author) {
   if (ex) JA_MATCHED.add(ex[5]);
   return ex;
 }
+// ORT の対象年齢：Oxford Owl（出版社 OUP の保護者向けサイト）の Oxford Level と英国の学年の対応
+//  Level 1〜3＝Reception（4〜5歳）、4＝Reception〜Year 1、5・6＝Year 1（5〜6歳）、7＝Year 1〜2、8〜12＝Year 2〜3（6〜8歳）
+const ORT_AGE = { '1': [4, 5, 'Reception'], '1+': [4, 5, 'Reception'], '2': [4, 5, 'Reception'], '3': [4, 5, 'Reception'],
+  '4': [4, 6, 'Reception〜Year 1'], '5': [5, 6, 'Year 1'], '6': [5, 6, 'Year 1'], '7': [5, 7, 'Year 1〜2'],
+  '8': [6, 8, 'Year 2〜3'], '9': [6, 8, 'Year 2〜3'], '10': [6, 8, 'Year 2〜3'], '11': [6, 8, 'Year 2〜3'], '12': [6, 8, 'Year 2〜3'] };
+function ortTarget(stage) {
+  const a = ORT_AGE[stage];
+  return a ? { tgt: `ORT Stage ${stage}：${a[0]}〜${a[1]}歳（${a[2]}・出版社の目安）`, tgtAge: a[0] } : {};
+}
 const normTitle = (t) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
 const EXACT_BY_TITLE = new Map(EN_EXACT.map((r) => [normTitle(r[0]), r]));
 const EN_TITLES = new Set(EN.map((r) => normTitle(r[0])));
@@ -214,6 +223,7 @@ const ALL_BOOKS = [
   ...EN_ORT.map(([title, stage, pack, count]) => ({
     pid: 'r' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
     series: `Oxford Reading Tree (ORT) Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
+    ...ortTarget(stage),
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
   // Scholastic Branches（出版社公表の語数）。リストに同じ本があれば、そちらに語数を付ける（dedupeSeries）

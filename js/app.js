@@ -1187,9 +1187,12 @@ async function backfillTargets() {
   // 以前の学年表記（「小1〜小3」など）で保存した対象を、年齢表記に直す
   let migrated = false;
   for (const l of state.logs) {
-    if (l.tgt && /小\d|プレスクール|年長/.test(l.tgt)) {
+    // シリーズの年齢を見直したとき（例：Mercy Watson 6〜9歳の目安 → 5〜8歳の出版社の対象）も、記録の表記をそろえる
+    if (l.tgt && !/手入力/.test(l.tgt)) {
       const t = seriesTarget(l.tgt);
-      if (t) { l.tgt = t.label; l.tgtAge = t.age; l.updatedAt = Date.now(); migrated = true; }
+      if (t && t.label !== l.tgt && (/小\d|プレスクール|年長/.test(l.tgt) || l.tgt.split('：')[0] === t.label.split('：')[0])) {
+        l.tgt = t.label; l.tgtAge = t.age; l.updatedAt = Date.now(); migrated = true;
+      }
     }
   }
   if (migrated) commit();

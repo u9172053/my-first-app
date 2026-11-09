@@ -44,7 +44,15 @@ const SERIES_TARGETS = [
   { re: /wimpy\s*kid|jeff\s*kinney/i, fixed: T('Diary of a Wimpy Kid', 8, 12, '書店などの目安') },
   { re: /elephant\s*(&|and)\s*piggie|elephant and piggie/i, fixed: T('Elephant & Piggie', 3, 8, '書店などの目安') },
   { re: /junie\s*b\.?\s*jones|barbara\s*park/i, fixed: T('Junie B. Jones', 6, 9, '書店などの目安') },
-  { re: /mercy\s*watson/i, fixed: T('Mercy Watson', 6, 9, '書店などの目安') },
+  { re: /mercy\s*watson/i, fixed: T('Mercy Watson', 5, 8, '出版社の対象') }, // Candlewick（販売元 Penguin Random House の Brightly）：Ages 5–8, Grades K–3
+  { re: /nate\s*the\s*great|olivia\s*sharp/i, fixed: T('Nate the Great', 6, 9, '出版社の対象') }, // Penguin Random House（Brightly）：Ages 6–9
+  { re: /oxford\s*reading\s*tree|\bORT\b/i, level: /(?:stage|level)\s*(1\+|\d{1,2})\b/i, map: {
+    1: T('ORT Stage 1', 4, 5, 'Reception・出版社の目安'), '1+': T('ORT Stage 1+', 4, 5, 'Reception・出版社の目安'),
+    2: T('ORT Stage 2', 4, 5, 'Reception・出版社の目安'), 3: T('ORT Stage 3', 4, 5, 'Reception・出版社の目安'),
+    4: T('ORT Stage 4', 4, 6, 'Reception〜Year 1・出版社の目安'), 5: T('ORT Stage 5', 5, 6, 'Year 1・出版社の目安'),
+    6: T('ORT Stage 6', 5, 6, 'Year 1・出版社の目安'), 7: T('ORT Stage 7', 5, 7, 'Year 1〜2・出版社の目安'),
+    8: T('ORT Stage 8', 6, 8, 'Year 2〜3・出版社の目安'), 9: T('ORT Stage 9', 6, 8, 'Year 2〜3・出版社の目安'),
+  } },
   { re: /a\s*to\s*z\s*mysteries|ron\s*roy/i, fixed: T('A to Z Mysteries', 6, 9, '書店などの目安') },
   { re: /judy\s*moody|megan\s*mcdonald/i, fixed: T('Judy Moody', 6, 10, '書店などの目安') },
   { re: /princess\s*in\s*black/i, fixed: T('The Princess in Black', 5, 8, '書店などの目安') },
