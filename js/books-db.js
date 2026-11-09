@@ -295,7 +295,7 @@ export const PRESET_BOOKS = dedupeSeries(ALL_BOOKS.filter((b) => !/1冊/.test(b.
 for (const b of PRESET_BOOKS) {
   const f = EN_LIB_FILL[b.pid];
   if (!f) continue;
-  if (f[2] != null && b.tgtAge == null) { b.tgt = f[3]; b.tgtAge = f[2]; }
+  if (f[2] != null && (b.tgtAge == null || /目安/.test(b.tgt || ''))) { b.tgt = f[3]; b.tgtAge = f[2]; } // 本ごとの出版社の年齢は、目安より優先
   if (b.count || !f[0]) continue;
   b.count = f[0]; b.exact = true; b.wordSrc = 'jera';
   if (f[1] && !b.isbn) b.isbn = f[1];
