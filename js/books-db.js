@@ -217,10 +217,14 @@ const ALL_BOOKS = [
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
   // Scholastic Branches（出版社公表の語数）。リストに同じ本があれば、そちらに語数を付ける（dedupeSeries）
-  ...EN_BRANCHES.map(([title, author, series, num, count, grl]) => ({
-    pid: 'b' + normTitle(series + title), lang: 'en', title, author, series: `${series}${num ? ' #' + num : ''}`,
+  // Scholastic の Branches（5〜8歳）と、その1つ下の Acorn（Pre-K〜Grade 3＝4〜9歳）。語数は公式のレベル表
+  ...EN_BRANCHES.map(([title, author, series, num, count, grl, line]) => ({
+    pid: 'b' + normTitle(series + title), lang: 'en', title, author, series, num: num ? +num : null,
     count, exact: true, published: true, reliable: true, classic: true, lbl: `${series} #${num}`,
-    lv: ({ K: 1.6, L: 2.0, M: 2.2, N: 2.5, O: 2.8, P: 3.0 })[grl] ?? 2.4,
+    tgt: line === 'A' ? `Acorn：4〜9歳（出版社の対象）` : `Branches：5〜8歳（出版社の対象）`, tgtAge: line === 'A' ? 4 : 5,
+    lv: line === 'A'
+      ? ({ E: 0.9, F: 1.0, G: 1.1, H: 1.2, I: 1.3, J: 1.4, K: 1.6, L: 1.8 })[grl] ?? 1.3
+      : ({ K: 1.6, L: 2.0, M: 2.2, N: 2.5, O: 2.8, P: 3.0 })[grl] ?? 2.4,
   })),
   // レベル別リーダー（対象年齢はシリーズのレベルから）
   ...EN_SERIES.map(([title, author, lvtxt, isbn, cover]) => {

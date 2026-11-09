@@ -430,7 +430,7 @@ function renderReco() {
     const p = preset(l), t = l.times || 1;
     if (p?.series) {
       favSeries.set(p.series, (favSeries.get(p.series) || 0) + t);
-      const n = volNum(p.title);
+      const n = volNum(p);
       if (n != null) maxNum.set(p.series, Math.max(maxNum.get(p.series) ?? 0, n));
     }
     const ak = authorKey(l.author || p?.author);
@@ -443,7 +443,7 @@ function renderReco() {
     let r = { s: 0, why: '' };
     const sameAuthorSeries = b.series && authorKey(b.series) === authorKey(b.author);
     if (b.series && favSeries.has(b.series) && !sameAuthorSeries) {
-      const n = volNum(b.title), mx = maxNum.get(b.series);
+      const n = volNum(b), mx = maxNum.get(b.series);
       if (n != null && mx != null && n > mx && n <= mx + 3) r = { s: 0.65 - 0.05 * (n - mx - 1), why: '📚 シリーズの次の巻' };
       else r = { s: 0.35 + Math.min(0.2, favSeries.get(b.series) * 0.04), why: '📚 よく読むシリーズ' };
     } else if (favAuthor.has(authorKey(b.author))) {
@@ -512,7 +512,7 @@ function renderReco() {
 }
 
 // タイトルの「#3」などの巻数
-const volNum = (t) => { const m = /#\s?(\d+)/.exec(t || ''); return m ? +m[1] : null; };
+const volNum = (b) => { if (b?.num != null) return b.num; const m = /#\s?(\d+)/.exec(b?.title || ''); return m ? +m[1] : null; };
 
 function recoCard(b, why = '') {
   return `
