@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShareImage, canvasToFile } from './share.js';
 
@@ -638,6 +638,7 @@ function renderDay() {
 // ---------------- 追加ダイアログ ----------------
 let addDate = null;
 function openAdd(date = null, log = null) {
+  loadPubAges(); // 検索・記録で使う出版社の対象年齢を先に読み込んでおく
   editing = log;
   addDate = date || (log?.date) || todayStr();
   $('#searchInput').value = '';
@@ -708,6 +709,11 @@ function onSearch() {
   if (!q) { itemIdx = 0; renderSearchEmpty(); return; }
   itemIdx = 0;
   const presets = searchPresets(q, 30).filter((b) => langOk(b.lang)).slice(0, 15);
+  // 出版社の目録（対象年齢つき）からも探す。リストにある本と同じものは除く
+  if (langOk('ja')) {
+    const have = new Set(presets.map((b) => b.isbn).filter(Boolean)), haveT = new Set(presets.map((b) => norm(b.title)));
+    presets.push(...searchPub(q, 10).filter((b) => !have.has(b.isbn) && !haveT.has(norm(b.title))));
+  }
   const base = presets.length ? '<div class="res-label">📚 登録済みの本</div>' + presets.map(itemHtml).join('') : '';
   setResults(base + '<div class="res-label">🔎 ほかの本を検索中…</div>', [...presets]);
   searchTimer = setTimeout(async () => {
@@ -746,6 +752,10 @@ function showForm() {
   $('#fChars').value = b.lang === 'ja' && b.count ? b.count : '';
   $('#wordHint').textContent = b.published ? '（出版社の公表値）' : b.exact ? '' : '（わかる場合は入力）';
   fillAgeField(b, editing);
+  // 出版社の対象年齢の一覧がまだなら、読み込んでから自動の年齢を入れ直す（自分で選び直していたら触らない）
+  if (b.lang === 'ja' && b.isbn && !pubAge(b.isbn)) {
+    loadPubAges().then(() => { if (picked === b && pubAge(b.isbn) && $('#fAge').value === $('#fAge').dataset.auto) fillAgeField(b, editing); });
+  }
   $('#fDate').value = editing?.date || addDate;
   $('#fTimes').value = editing?.times || 1;
   $('#deleteLog').hidden = !editing;
@@ -756,6 +766,8 @@ function showForm() {
 // 記録画面の「対象年齢」：分かっている年齢を自動で選び、分からなければ自分で選べる
 function knownAge(b) {
   const p = b.pid ? PRESET_BY_PID.get(b.pid) : null;
+  const pa = pubAge(b.isbn || p?.isbn); // 出版社サイトの対象年齢
+  if (pa) return { age: pa.age, label: pa.label };
   if (b.tgtAge != null) return { age: b.tgtAge, label: b.tgt };
   if (p?.tgtAge != null) return { age: p.tgtAge, label: p.tgt };
   if (b.lang === 'ja' && p?.age != null) return { age: jaAgeNum(p.age), label: jaAge(p.age) + '（目安）' };
@@ -769,7 +781,8 @@ function fillAgeField(b, log) {
   const k = log?.tgtAge != null ? { age: log.tgtAge, label: log.tgt } : knownAge(b);
   $('#fAge').value = k ? String(Math.round(k.age)) : '';
   $('#fAge').dataset.auto = k ? String(Math.round(k.age)) : '';
-  $('#ageHint').textContent = k?.label ? `（${k.label.replace(/^[^：]*：/, '')}）` : '（わかる場合は選択）';
+  const lb = k?.label ? k.label.replace(/^[^：]*：/, '') : '';
+  $('#ageHint').textContent = lb ? (/）$/.test(lb) ? lb : `（${lb}）`) : '（わかる場合は選択）';
 }
 
 function langFields() {
@@ -1156,6 +1169,17 @@ function autoHeight() {
 
 // リスト外の英語の本で、出版社の対象がまだ分からない記録は、別の版から対象を探して補う（1回あたり数冊まで）
 async function backfillTargets() {
+  // 出版社サイトの対象年齢：ISBNが分かる日本語の記録で、年齢が入っていない・目安だけのものを埋める
+  await loadPubAges();
+  let pubFilled = false;
+  for (const l of state.logs) {
+    if (l.deleted || /手入力/.test(l.tgt || '')) continue; // 自分で選んだ年齢はそのまま
+    const pa = pubAge(l.isbn || PRESET_BY_PID.get(l.pid)?.isbn);
+    if (pa && (l.tgtAge == null || !/（[^）]*(?:書店|社|館)）$/.test(l.tgt || '')) && l.tgt !== pa.label) {
+      l.tgt = pa.label; l.tgtAge = pa.age; l.updatedAt = Date.now(); pubFilled = true;
+    }
+  }
+  if (pubFilled) commit();
   // 以前の学年表記（「小1〜小3」など）で保存した対象を、年齢表記に直す
   let migrated = false;
   for (const l of state.logs) {

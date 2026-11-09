@@ -35,6 +35,27 @@ export function findPresetByTitle(title) {
 }
 
 // 国立国会図書館サーチの書影（日本の本向け。画像がなければ表示側で代わりのアイコンに切り替え）
+// ---------------- 出版社が公表している対象年齢（日本語の本） ----------------
+// data/ja-pub.json：[ISBN, 書名, 著者, 年齢, 表記] の一覧。大きいので必要になったときだけ読み込む
+let pubRows = null, pubByIsbn = new Map(), pubLoading = null;
+export function loadPubAges() {
+  if (pubRows) return Promise.resolve(pubRows);
+  return (pubLoading ||= fetch(new URL('../data/ja-pub.json', import.meta.url)).then((r) => r.json()).then((rows) => {
+    pubRows = rows.map(([isbn, title, author, age, label]) => ({ isbn, title, author, age, label, key: norm(title) }));
+    pubByIsbn = new Map(pubRows.map((r) => [r.isbn, r]));
+    return pubRows;
+  }).catch(() => { pubLoading = null; return []; }));
+}
+export const pubAge = (isbn) => pubByIsbn.get(isbn) || null;
+// 書名で探す（リストにない本の検索結果に出す）
+export function searchPub(q, n = 10) {
+  if (!pubRows) return [];
+  const k = norm(q); if (!k) return [];
+  const hits = pubRows.filter((r) => r.key.includes(k));
+  hits.sort((a, b) => (a.key.startsWith(k) ? 0 : 1) - (b.key.startsWith(k) ? 0 : 1) || a.key.length - b.key.length);
+  return hits.slice(0, n).map((r) => ({ title: r.title, author: r.author, isbn: r.isbn, lang: 'ja', tgt: r.label, tgtAge: r.age, cover: '' }));
+}
+
 // ISBNが分かる本の表紙候補をつなげる（先頭から順に試し、読めない・極小の画像なら次へ）
 // 版元ドットコム(openBD) → 国立国会図書館 → Open Library（Google Books は検索で表紙が分かったときだけ先頭に入る）
 export function withIsbnCovers(cover, isbn) {

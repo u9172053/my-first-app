@@ -1,4 +1,5 @@
 import { JA_BOOKS, JA_CLASSICS, JA_EXACT, JA_RAKUTEN } from './books-ja.js';
+import { JA_PUB } from './books-ja-pub.js';
 import { EN_EXACT, EN_EXTRA, EN_PUBLISHED, EN_ORT, EN_SERIES, EN_BRANCHES } from './books-en.js';
 import { seriesTarget, titleKeys } from './targets.js';
 
@@ -247,8 +248,10 @@ const ALL_BOOKS = [
     const chars = ex ? ex[4] : 0;
     const rk = JA_RAKUTEN[isbn]; // 楽天ブックスの対象年齢・商品ページ
     const rkAge = rk && rk[0] != null ? { tgt: `${rk[0]}〜${rk[1] ?? ''}歳（楽天ブックスの目安）`, tgtAge: rk[0] } : {};
+    const pub = JA_PUB[isbn]; // 出版社サイトに載っている対象年齢（いちばん優先）
+    const pubAge = pub ? { tgt: pub[1], tgtAge: pub[0] } : {};
     return {
-      ...rkAge, rkUrl: rk?.[2] || '',
+      ...rkAge, ...pubAge, rkUrl: rk?.[2] || '',
       exact: !!ex,
     pid: 'j' + (isbn || title), lang: 'ja', title, author, series, count: chars || 0, lv: null, age,
     classic: JA_CLASSICS.has(title),    // 定番（優先して出す）
