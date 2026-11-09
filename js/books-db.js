@@ -220,16 +220,16 @@ const ALL_BOOKS = [
     pid: 'g' + pg, lang: 'en', title, author, series: author, count, lv, exact: true, isbn, olCover, rl, classic: true, reliable: true,
   })),
   // Oxford Reading Tree の各巻（語数つき）。レベルはステージごとの目安
-  ...EN_ORT.map(([title, stage, pack, count]) => ({
-    pid: 'r' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
+  ...EN_ORT.map(([title, stage, pack, count, isbn]) => ({
+    pid: 'r' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt', isbn: isbn || '',
     series: `Oxford Reading Tree (ORT) Stage ${stage} ${pack}`.trim(), lbl: `ORT Stage ${stage}`, count, exact: true, reliable: true, classic: true,
     ...ortTarget(stage),
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
-  ...EN_ORT_DD.map(([title, stage, pack]) => ({
-    pid: 'rd' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt',
+  ...EN_ORT_DD.map(([title, stage, pack, count, isbn]) => ({
+    pid: 'rd' + stage + '-' + normTitle(title), lang: 'en', title, author: 'Roderick Hunt', isbn,
     series: `Oxford Reading Tree (ORT) Decode and Develop Level ${stage} ${pack}`.trim(), lbl: `ORT Decode and Develop Level ${stage}`,
-    count: 0, reliable: true, ...ortTarget(stage),
+    count, exact: count > 0, reliable: true, classic: true, ...ortTarget(stage),
     lv: ({ '1': 0.1, '1+': 0.15, '2': 0.2, '3': 0.3, '4': 0.5, '5': 0.7, '6': 0.9, '7': 1.1, '8': 1.3, '9': 1.5 })[stage] ?? 0.5,
   })),
   // Scholastic Branches（出版社公表の語数）。リストに同じ本があれば、そちらに語数を付ける（dedupeSeries）
