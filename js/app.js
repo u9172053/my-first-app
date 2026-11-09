@@ -423,14 +423,43 @@ function renderReco() {
   const readTitles = new Set(logs.map((l) => l.title));
   const recent = logs.filter((l) => l.lang === recoLang).slice(0, 15);
   const preset = (l) => PRESET_BOOKS.find((b) => b.pid === l.pid);
-  const recentSeries = new Set(recent.map((l) => preset(l)?.series).filter(Boolean));
+  // その子のお気に入り：最近40冊でよく読んでいるシリーズ・作者（読み返した回数も数える）と、シリーズで読んだいちばん新しい巻
+  const favSeries = new Map(), favAuthor = new Map(), maxNum = new Map();
+  const authorKey = (s) => norm(String(s || '').split(/[,、・／/]/)[0]);
+  for (const l of logs.filter((x) => x.lang === recoLang).slice(0, 40)) {
+    const p = preset(l), t = l.times || 1;
+    if (p?.series) {
+      favSeries.set(p.series, (favSeries.get(p.series) || 0) + t);
+      const n = volNum(p.title);
+      if (n != null) maxNum.set(p.series, Math.max(maxNum.get(p.series) ?? 0, n));
+    }
+    const ak = authorKey(l.author || p?.author);
+    if (ak) favAuthor.set(ak, (favAuthor.get(ak) || 0) + t);
+  }
+  // つながりがある本ほど上に（シリーズの次の巻 ＞ よく読むシリーズ ＞ 同じ作者）。理由はカードにも表示
+  const relCache = new Map();
+  const rel = (b) => {
+    if (relCache.has(b.pid)) return relCache.get(b.pid);
+    let r = { s: 0, why: '' };
+    const sameAuthorSeries = b.series && authorKey(b.series) === authorKey(b.author);
+    if (b.series && favSeries.has(b.series) && !sameAuthorSeries) {
+      const n = volNum(b.title), mx = maxNum.get(b.series);
+      if (n != null && mx != null && n > mx && n <= mx + 3) r = { s: 0.65 - 0.05 * (n - mx - 1), why: '📚 シリーズの次の巻' };
+      else r = { s: 0.35 + Math.min(0.2, favSeries.get(b.series) * 0.04), why: '📚 よく読むシリーズ' };
+    } else if (favAuthor.has(authorKey(b.author))) {
+      r = { s: 0.25 + Math.min(0.15, favAuthor.get(authorKey(b.author)) * 0.03), why: '✍️ よく読む作者の本' };
+    } else if (b.classic) r = { s: 0.05, why: '⭐ 定番の人気作' };
+    relCache.set(b.pid, r);
+    return r;
+  };
+  const slack = (b) => (rel(b).s >= 0.25 ? 0.5 : 0); // つながりのある本はレベルの幅を少し広げて拾う
   // おすすめには、文字数・語数の根拠がある本（実際のページ数や全文から計算できた本）だけを出す
   const a = activeChild();
   const adultMode = a === 'all' ? children().some((c) => c.adult) : !!children().find((c) => c.id === a)?.adult;
   const cands = PRESET_BOOKS.filter((b) => b.lang === recoLang && (b.reliable || (adultMode && b.gr)) && !readPids.has(b.pid) && !readTitles.has(b.title) && !/平均/.test(b.title));
   // 表紙が出なかった本は順位を下げる（外しはしない）。表紙が出た本はわずかに優先
   const coverScore = (b) => (coverMissed(b.pid) ? 0.6 : coverStatus[b.pid] === 1 ? -0.05 : 0);
-  const bonus = (b) => (recentSeries.has(b.series) ? -0.2 : 0) + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
+  const bonus = (b) => -rel(b).s + (/1冊/.test(b.title) ? 0.3 : 0) + coverScore(b)
     + (b.classic || b.gr ? 0 : Math.max(0, 0.3 - Math.log10((b.rl || 0) + 1) / 10)) // 定番・人気の本を優先
     ;
   const used = new Set();
@@ -440,7 +469,7 @@ function renderReco() {
     const levels = recent.map((l) => preset(l)?.lv ?? estimateLevel(l.count)).filter((v) => v != null);
     const avg = levels.length ? levels.reduce((s, v) => s + v, 0) / levels.length : null;
     const base = avg ?? 0.3;
-    const sameScore = (b) => (Math.abs(b.lv - base) <= 0.5 ? Math.abs(b.lv - base) + bonus(b) : null);
+    const sameScore = (b) => (Math.abs(b.lv - base) <= 0.5 + slack(b) ? Math.abs(b.lv - base) + bonus(b) : null);
     const upScore = (b) => (b.lv > base + 0.2 && b.lv <= base + 1.5 ? Math.abs(b.lv - (base + 0.7)) + bonus(b) : null);
     if (adultMode) {
       // 大人：学習者向けの本2冊＋子ども向けの本2冊ずつ（レベル的に子どもの本を読みたい人もいるので両方出す）
@@ -461,7 +490,7 @@ function renderReco() {
     const ages = recent.map((l) => preset(l)?.age ?? charsToAge(l.count)).filter((v) => v != null);
     const avg = ages.length ? ages.reduce((s, v) => s + v, 0) / ages.length : null;
     const base = avg ?? 1;
-    same = pickBooks(cands, (b) => (Math.abs(b.age - base) <= 0.75 ? Math.abs(b.age - base) + bonus(b) : null), 4, used);
+    same = pickBooks(cands, (b) => (Math.abs(b.age - base) <= 0.75 + slack(b) ? Math.abs(b.age - base) + bonus(b) : null), 4, used);
     up = pickBooks(cands, (b) => (b.age > base + 0.5 && b.age <= base + 2.5 ? Math.abs(b.age - (base + 1.5)) + bonus(b) : null), 4, used);
     if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.age - base), 4 - same.length, used));
     if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.age > base ? b.age - base : null), 4 - up.length, used));
@@ -470,8 +499,9 @@ function renderReco() {
   }
 
   $('#recoNote').textContent = note;
-  $('#recoSame').innerHTML = same.map(recoCard).join('');
-  $('#recoUp').innerHTML = up.map(recoCard).join('') || '<p class="muted small">今のところ、これより上のおすすめはありません。</p>';
+  const card = (b) => recoCard(b, rel(b).why);
+  $('#recoSame').innerHTML = same.map(card).join('');
+  $('#recoUp').innerHTML = up.map(card).join('') || '<p class="muted small">今のところ、これより上のおすすめはありません。</p>';
   [...same, ...up].forEach((b) => {
     if (cachedCover(b.pid) !== undefined) return;
     fetchPresetCover(b).then((url) => {
@@ -481,10 +511,14 @@ function renderReco() {
   });
 }
 
-function recoCard(b) {
+// タイトルの「#3」などの巻数
+const volNum = (t) => { const m = /#\s?(\d+)/.exec(t || ''); return m ? +m[1] : null; };
+
+function recoCard(b, why = '') {
   return `
     <div class="reco">
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
+      ${why ? `<div class="rel">${why}</div>` : ''}
       <div class="t">${esc(b.title)}</div>
       <div class="age ${b.lang}">${b.tgt ? esc(b.tgt) : b.lang === 'en' ? (b.gr || b.lbl || enAge(b.lv)) : jaAge(b.age) + '（目安）'}</div>
       <div class="why">${b.lang === 'en' && b.count ? `<b class="cnt en">${fmt(b.count)}語</b>・` : ''}${esc(b.author || b.series)}</div>
