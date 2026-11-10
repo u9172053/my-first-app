@@ -290,7 +290,9 @@ const ALL_BOOKS = [
 
 // 「シリーズ（1冊）」のまとめ項目は、個別の本があり語数の目安も使わなくなったので表示しない
 // （データからは消さない：英語の定番の本のIDは並び順の番号なので、消すと過去の記録がずれるため）
-export const PRESET_BOOKS = dedupeSeries(ALL_BOOKS.filter((b) => !/1冊/.test(b.title)));
+// ISBN のない本は入れない（同じ本かどうかは ISBN で判断し、バーコードで当たる本だけを持つ）
+export const PRESET_BOOKS = dedupeSeries(ALL_BOOKS.filter((b) => !/1冊/.test(b.title))).filter((b) => /^97[89]\d{10}$/.test(b.isbn || ''))
+  .filter((b, i, all) => all.findIndex((x) => x.isbn === b.isbn) === i); // 同じ ISBN は1冊に
 // 語数がまだない本に、日本多読学会の語数リストの値（とISBN）を補う
 for (const b of PRESET_BOOKS) {
   const f = EN_LIB_FILL[b.pid];
