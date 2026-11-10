@@ -731,8 +731,8 @@ function onSearch() {
   const presets = searchPresets(q, 30).filter((b) => langOk(b.lang)).slice(0, 15);
   // 出版社の目録（対象年齢つき）からも探す。リストにある本と同じものは除く
   if (langOk('ja')) {
-    const have = new Set(presets.map((b) => b.isbn).filter(Boolean)), haveT = new Set(presets.map((b) => norm(b.title)));
-    presets.push(...searchPub(q, 10).filter((b) => !have.has(b.isbn) && !haveT.has(norm(b.title))));
+    const have = new Set(presets.map((b) => b.isbn).filter(Boolean)); // 同じ本かどうかは ISBN だけで判断
+    presets.push(...searchPub(q, 10).filter((b) => !have.has(b.isbn)));
   }
   if (langOk('en')) presets.push(...searchEnLib(q, 15)); // 洋書の語数リスト（本のリストと重ならない本だけが入っている）
   const base = presets.length ? '<div class="res-label">📚 登録済みの本</div>' + presets.map(itemHtml).join('') : '';
