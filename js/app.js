@@ -808,7 +808,7 @@ function fillAgeField(b, log) {
   const k = log?.tgtAge != null ? { age: log.tgtAge, label: log.tgt } : knownAge(b);
   $('#fAge').value = k ? String(Math.round(k.age)) : '';
   $('#fAge').dataset.auto = k ? String(Math.round(k.age)) : '';
-  $('#ageHint').textContent = k ? `（${ageText(k.label, k.age)}）` : '（わかる場合は選択）';
+  $('#ageHint').textContent = k ? '' : '（わかる場合は選択）'; // 年齢は選択欄に出ているので、横には出さない
 }
 
 function langFields() {

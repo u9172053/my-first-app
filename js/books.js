@@ -123,6 +123,14 @@ export async function searchGoogleBooks(q, signal) {
 }
 
 // バーコード(ISBN)から本を探す：openBD → Google Books → Open Library の順
+// 書誌の著者表記（「工藤,ノリコ,1970-」「中川李枝子／作」など）を、「工藤ノリコ」の形に整える
+function cleanAuthor(a) {
+  const t = String(a || '').replace(/,\s*\d{4}-?\d{0,4}/g, '').trim(); // 生年・没年を外す
+  if (/[\u3040-\u30ff\u4e00-\u9fff]/.test(t)) {
+    return t.split(/\s+|[／/]/)[0].replace(/^([^,]+),\s*([^,]+)$/, '$1$2').replace(/[,，]\s*$/, ''); // 「工藤,ノリコ」→「工藤ノリコ」
+  }
+  return t.replace(/^([^,]+),\s*([^,]+)$/, '$2 $1'); // 「Rowling, J. K.」→「J. K. Rowling」
+}
 export async function lookupIsbn(isbn) {
   try {
     const r = await fetch(`https://api.openbd.jp/v1/get?isbn=${isbn}`);
@@ -133,7 +141,7 @@ export async function lookupIsbn(isbn) {
       let g = '';
       if (!s.cover) { try { g = (await searchGoogleBooks(`isbn:${isbn}`))[0]?.cover || ''; } catch { /* なくてもOK */ } }
       if (g.includes('ndlsearch')) g = '';
-      return { title: s.title, author: (s.author || '').replace(/／著.*$/, ''), isbn, cover: withIsbnCovers(s.cover || g, isbn), lang: isJapanese(s.title) ? 'ja' : 'en' };
+      return { title: s.title, author: cleanAuthor(s.author), isbn, cover: withIsbnCovers(s.cover || g, isbn), lang: isJapanese(s.title) ? 'ja' : 'en' };
     }
   } catch { /* 次へ */ }
   try {
