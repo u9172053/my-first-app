@@ -741,10 +741,16 @@ function onSearch() {
     searchCtl = new AbortController();
     try {
       const web = shareTargets(await searchGoogleBooks(q, searchCtl.signal));
-      const seen = new Set(presets.map((p) => p.title.toLowerCase()));
-      const extra = web.filter((b) => !seen.has(b.title.toLowerCase())).map((b) => {
-        const p = findPresetByTitle(b.title);
-        return p ? { ...b, count: p.count, pid: p.pid, lang: p.lang } : b;
+      // ネット検索の結果も、同じ本かどうかは ISBN だけで判断。ISBN のない結果は出さない
+      await Promise.all([loadPubAges(), loadEnLib()]);
+      const seen = new Set(presets.map((p) => p.isbn).filter(Boolean));
+      const extra = web.filter((b) => /^97[89]\d{10}$/.test(b.isbn || '') && !seen.has(b.isbn) && !PRESET_BOOKS.some((x) => x.isbn === b.isbn))
+        .filter((b, i, all) => all.findIndex((x) => x.isbn === b.isbn) === i).map((b) => {
+        const lib = enLibBook(b.isbn); // 洋書の語数リストにある本なら語数・年齢つきで
+        if (lib) return { ...b, ...lib, title: lib.title || b.title, cover: b.cover };
+        const pa = pubAge(b.isbn); // 出版社の目録にある日本語の本なら年齢つきで
+        if (pa) return { ...b, lang: 'ja', tgt: pa.label, tgtAge: pa.age };
+        return b;
       }).filter((b) => langOk(b.lang));
       itemIdx = presets.length;
       const html = base + (extra.length ? '<div class="res-label">🔎 その他の本（語数は手入力）</div>' + extra.map(itemHtml).join('') : (presets.length ? '' : '<p class="muted center">見つかりませんでした。手入力で登録できます。</p>'));
@@ -882,7 +888,7 @@ async function openScan() {
       }
       // ISBNで本のリスト → 洋書の語数リストの順に探し、なければ書名で探す
       await loadEnLib();
-      const p = PRESET_BOOKS.find((x) => x.isbn === isbn) || findPresetByTitle(b.title);
+      const p = PRESET_BOOKS.find((x) => x.isbn === isbn); // 同じ本かどうかは ISBN だけで判断
       const lib = !p && enLibBook(isbn);
       if (lib) { pickBook({ ...b, ...lib, title: lib.title || b.title, cover: withIsbnCovers(b.cover, isbn) }); return; }
       // リストにある本なら、リストの表紙（取得済み）を先頭に

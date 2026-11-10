@@ -98,7 +98,7 @@ export { seriesTarget, agesFromText, titleKeys, shareTargets };
 function mapGoogle(item) {
   const v = item.volumeInfo || {};
   const ids = v.industryIdentifiers || [];
-  const isbn = (ids.find((i) => i.type === 'ISBN_13') || ids.find((i) => i.type === 'ISBN_10'))?.identifier || '';
+  const isbn = ids.find((i) => i.type === 'ISBN_13')?.identifier || isbn10to13(ids.find((i) => i.type === 'ISBN_10')?.identifier);
   const cover = (v.imageLinks?.thumbnail || v.imageLinks?.smallThumbnail || '').replace(/^http:/, 'https:') || ndlThumb(isbn);
   const title = [v.title, v.subtitle].filter(Boolean).join(': ');
   const desc = (v.description || '').slice(0, 2000);
@@ -297,6 +297,13 @@ export function fetchPresetCover(book) {
 }
 
 // ---------------- アフィリエイトリンク ----------------
+// ISBN-10 → ISBN-13（978 を付けてチェック数字を計算し直す）
+export function isbn10to13(i10) {
+  if (!/^\d{9}[\dX]$/i.test(i10 || '')) return '';
+  const core = '978' + i10.slice(0, 9);
+  const sum = [...core].reduce((s, d, k) => s + (+d) * (k % 2 ? 3 : 1), 0);
+  return core + ((10 - (sum % 10)) % 10);
+}
 function isbn13to10(isbn) {
   if (!/^978\d{10}$/.test(isbn)) return null;
   const core = isbn.slice(3, 12);
