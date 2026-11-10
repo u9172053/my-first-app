@@ -300,6 +300,18 @@ for (const b of PRESET_BOOKS) {
   b.count = f[0]; b.exact = true; b.wordSrc = 'jera';
   if (f[1] && !b.isbn) b.isbn = f[1];
 }
+// 学習者向けの本で年齢がまだない本は、同じステージ（Oxford Bookworms Stage 2 など）の本でいちばん多い年齢にそろえる
+{
+  const byGr = new Map();
+  for (const b of PRESET_BOOKS) if (b.gr && b.tgtAge != null) {
+    const m = byGr.get(b.gr) || new Map(); m.set(b.tgtAge, (m.get(b.tgtAge) || 0) + 1); byGr.set(b.gr, m);
+  }
+  for (const b of PRESET_BOOKS) {
+    if (!b.gr || b.tgtAge != null || !byGr.has(b.gr)) continue;
+    const [age] = [...byGr.get(b.gr)].sort((x, y) => y[1] - x[1])[0];
+    b.tgtAge = age; b.tgt = `${b.gr}：${age}歳〜（同じステージの本の年齢）`;
+  }
+}
 
 // ・タイトルや説明に「Step into Reading Step 1」などがある本には、シリーズのレベルの対象年齢を付ける
 // ・レベル別リーダーの一覧と同じ本がすでにある場合は、一覧の方を外して既存の本に対象年齢を付ける

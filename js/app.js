@@ -771,7 +771,7 @@ function showForm() {
   document.querySelector(`input[name=fLang][value=${fl}]`).checked = true;
   $('#fWords').value = b.lang === 'en' && b.count ? b.count : '';
   $('#fChars').value = b.lang === 'ja' && b.count ? b.count : '';
-  $('#wordHint').textContent = b.published ? '（出版社の公表値）' : b.exact ? '' : '（わかる場合は入力）';
+  $('#wordHint').textContent = b.count ? '' : '（わかる場合は入力）'; // 語数の出どころは画面に出さない
   fillAgeField(b, editing);
   // 出版社の対象年齢の一覧がまだなら、読み込んでから自動の年齢を入れ直す（自分で選び直していたら触らない）
   if (b.lang === 'ja' && b.isbn && !pubAge(b.isbn)) {
