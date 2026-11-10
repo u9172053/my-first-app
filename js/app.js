@@ -484,7 +484,7 @@ function renderReco() {
     if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.lv - base), 4 - same.length, used));
     if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.lv > base ? b.lv - base : null), 4 - up.length, used));
     note = avg == null ? 'まだ英語の記録がないので、はじめての1冊におすすめの本を選びました。'
-      : `最近読んでいる英語の本は「${enAge(avg)}」くらい。それをもとに選びました。`;
+      : `最近読んでいる英語の本は「${ageText(enAge(avg), enAgeNum(avg))}」向けくらい。それをもとに選びました。`;
   } else {
     // 日本語は対象年齢の目安で選ぶ（リストにない本は、入力された文字数からおおよその年齢を推定）
     const ages = recent.map((l) => preset(l)?.age ?? charsToAge(l.count)).filter((v) => v != null);
@@ -495,7 +495,7 @@ function renderReco() {
     if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.age - base), 4 - same.length, used));
     if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.age > base ? b.age - base : null), 4 - up.length, used));
     note = avg == null ? 'まだ日本語の記録がないので、小さい子に人気の絵本を選びました。'
-      : `最近読んでいる日本語の本は「${jaAge(Math.round(avg))}」くらい。それをもとに選びました。`;
+      : `最近読んでいる日本語の本は「${ageText('', jaAgeNum(Math.round(avg)))}」向けくらい。それをもとに選びました。`;
   }
 
   $('#recoNote').textContent = note;
@@ -520,7 +520,7 @@ function recoCard(b, why = '') {
       <a class="reco-img" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored" data-pid="${b.pid}">${recoCover(cachedCover(b.pid), b)}</a>
       ${why ? `<div class="rel">${why}</div>` : ''}
       <div class="t">${esc(b.title)}</div>
-      <div class="age ${b.lang}">${b.tgt ? esc(b.tgt) : b.lang === 'en' ? (b.gr || b.lbl || enAge(b.lv)) : jaAge(b.age) + '（目安）'}</div>
+      ${bookAgeText(b) ? `<div class="age ${b.lang}">${bookAgeText(b)}</div>` : b.gr ? `<div class="age ${b.lang}">${esc(b.gr)}</div>` : ''}
       <div class="why">${b.lang === 'en' && b.count ? `<b class="cnt en">${fmt(b.count)}語</b>・` : ''}${esc(b.author || b.series)}</div>
       <div class="links">
         <a class="btn amazon" href="${esc(amazonUrl(b))}" target="_blank" rel="noopener sponsored">Amazon</a>
@@ -571,6 +571,22 @@ window.coverNext = (img) => {
     });
   } else img.src = rest[0];
 };
+
+// ---------------- 対象年齢の表示 ----------------
+// どこから取った年齢か（出版社・シリーズ・書店・YL など）はデータ（tgt）に残すが、画面には出さず「○〜○歳」「○歳〜」だけを見せる
+function ageText(label, age) {
+  const m = /(\d+)\s*[〜~～-]\s*(\d+)\s*歳/.exec(label || '');
+  if (m) return `${+m[1]}〜${+m[2]}歳`;
+  return age != null ? `${Math.round(age)}歳〜` : '';
+}
+// 本の対象年齢の表示（記録・リストの年齢 → 目安）。分からなければ空
+function bookAgeText(b) {
+  const k = knownAge(b);
+  if (k) return ageText(k.label, k.age);
+  if (b.lang === 'ja' && b.age != null) return ageText('', jaAgeNum(b.age));
+  if (b.lang === 'en' && b.lv != null && !b.gr) return ageText(enAge(b.lv), enAgeNum(b.lv));
+  return '';
+}
 
 // 対象年齢の目安（英語は英語圏の子どもの年齢、日本語は○歳ごろから）
 function enAge(lv) {
@@ -701,7 +717,7 @@ function itemHtml(b) {
   const n = b.lang === 'en' && b.count ? `${approx}${fmt(b.count)}語` : '';
   return `<button class="item" data-i="${i}">
     <div class="cover">${coverInner(cover, b.lang)}</div>
-    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${b.lang === 'ja' && b.age != null && !b.tgt ? '・' + jaAge(b.age) : ''}${b.tgt ? '・' + esc(b.tgt) : b.lang === 'en' && (b.gr || b.lbl || b.lv != null) ? '・' + (b.gr || b.lbl || enAge(b.lv)) : ''}</div></div>
+    <div class="grow"><div class="t"><span class="tag ${b.lang}">${b.lang === 'en' ? '英' : '日'}</span>${esc(b.title)}</div><div class="a">${esc(b.author || '')}${bookAgeText(b) ? '・' + bookAgeText(b) : b.gr ? '・' + esc(b.gr) : ''}</div></div>
     <div class="n ${b.lang}">${n}</div></button>`;
 }
 
@@ -786,8 +802,7 @@ function fillAgeField(b, log) {
   const k = log?.tgtAge != null ? { age: log.tgtAge, label: log.tgt } : knownAge(b);
   $('#fAge').value = k ? String(Math.round(k.age)) : '';
   $('#fAge').dataset.auto = k ? String(Math.round(k.age)) : '';
-  const lb = k?.label ? k.label.replace(/^[^：]*：/, '') : '';
-  $('#ageHint').textContent = lb ? (/）$/.test(lb) ? lb : `（${lb}）`) : '（わかる場合は選択）';
+  $('#ageHint').textContent = k ? `（${ageText(k.label, k.age)}）` : '（わかる場合は選択）';
 }
 
 function langFields() {
