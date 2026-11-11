@@ -84,8 +84,132 @@ export async function renderShareImage(canvas, d) {
 
   ctx.fillStyle = C.accent; ctx.font = `800 40px ${FONT}`;
   ctx.fillText(d.readDays ? `📖 ${d.month}月は ${d.readDays}日 読んだよ！` : '📖 コツコツ続けよう！', W / 2, 1270);
-  ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`;
-  ctx.fillText(CONFIG.hashtags.map((h) => '#' + h).join('  '), W / 2, 1320);
+  footer(ctx, W, 1320);
+}
+
+// 画像のいちばん下：どこで記録しているか（見た人がたどり着けるように）
+function footer(ctx, W, y) {
+  ctx.textAlign = 'center'; ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`;
+  ctx.fillText(`${CONFIG.siteName}「${CONFIG.appName}」で記録中`, W / 2, y);
+}
+function background(ctx, W, H) {
+  ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = 0.12;
+  [[90, 110, 70, C.en], [990, 160, 90, C.ja], [960, 1240, 80, C.accent], [70, 1200, 60, C.ja]].forEach(([x, y, r, c]) => {
+    ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+// 文字を幅に収まるよう折り返す（最大 lines 行）
+function wrap(ctx, text, maxW, lines) {
+  const out = []; let cur = '';
+  for (const ch of String(text)) {
+    if (ctx.measureText(cur + ch).width > maxW) { out.push(cur); cur = ch; if (out.length === lines) break; } else cur += ch;
+  }
+  if (out.length < lines && cur) out.push(cur);
+  if (out.length === lines && ctx.measureText(out[lines - 1]).width > maxW - 10) out[lines - 1] = out[lines - 1].slice(0, -1) + '…';
+  return out;
+}
+// 表紙の画像を読み込む（候補を順に試す。別サイトの画像は CORS が許可されていないと画像に描けないので、だめなら null）
+function loadCover(urls) {
+  const list = String(urls || '').split('|').filter((u) => /^https?:/.test(u));
+  return new Promise((res) => {
+    const next = () => {
+      const u = list.shift(); if (!u) return res(null);
+      const img = new Image(); img.crossOrigin = 'anonymous'; img.referrerPolicy = 'no-referrer';
+      const t = setTimeout(() => { img.src = ''; next(); }, 6000);
+      img.onload = () => { clearTimeout(t); if (img.naturalWidth < 40) next(); else res(img); };
+      img.onerror = () => { clearTimeout(t); next(); };
+      img.src = u;
+    };
+    next();
+  });
+}
+
+/**
+ * 本棚：その月に読んだ本の表紙を並べた画像
+ * @param {object} d { year, month, name, books: [{title, cover, lang}], jaBooks, enWords, enBooks, only }
+ */
+export async function renderShelfImage(canvas, d) {
+  try { await document.fonts.load(`700 40px "M PLUS Rounded 1c"`); } catch { /* システムフォントで代用 */ }
+  const W = 1080, H = 1350;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  background(ctx, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`; ctx.fillText(`📚 ${CONFIG.appName}`, W / 2, 100);
+  ctx.fillStyle = C.ink; ctx.font = `800 60px ${FONT}`;
+  ctx.fillText(`${d.year}年${d.month}月${d.name ? ' ' + d.name + 'の' : 'の'}本棚`, W / 2, 185);
+  const parts = [];
+  if (d.only !== 'en' && d.jaBooks) parts.push(`日本語 ${fmt(d.jaBooks)}冊`);
+  if (d.only !== 'ja' && d.enBooks) parts.push(`英語 ${fmt(d.enBooks)}冊・${fmt(d.enWords)}語`);
+  ctx.fillStyle = C.accent; ctx.font = `800 38px ${FONT}`; ctx.fillText(parts.join('　') || 'まだ記録がありません', W / 2, 250);
+  // 表紙のグリッド（冊数に合わせて 3〜5 列）
+  const books = d.books.slice(0, 20);
+  const cols = books.length <= 6 ? 3 : books.length <= 12 ? 4 : 5;
+  const rows = Math.max(1, Math.ceil(books.length / cols));
+  const gx = 70, gy = 300, gw = W - 140, gh = 960, gap = 22;
+  const cw = (gw - gap * (cols - 1)) / cols, ch = Math.min(cw * 1.38, (gh - gap * (rows - 1)) / rows);
+  const imgs = await Promise.all(books.map((b) => loadCover(b.cover)));
+  books.forEach((b, i) => {
+    const r = Math.floor(i / cols), c = i % cols;
+    const x = gx + c * (cw + gap), y = gy + r * (ch + gap);
+    ctx.save(); roundRect(ctx, x, y, cw, ch, 14); ctx.clip();
+    const img = imgs[i];
+    if (img) {
+      ctx.fillStyle = '#fff'; ctx.fillRect(x, y, cw, ch);
+      const s = Math.min(cw / img.naturalWidth, ch / img.naturalHeight);
+      const w = img.naturalWidth * s, h = img.naturalHeight * s;
+      ctx.drawImage(img, x + (cw - w) / 2, y + (ch - h) / 2, w, h);
+    } else {
+      // 表紙が使えない本は、色つきの本の形に書名を入れる
+      ctx.fillStyle = b.lang === 'en' ? C.en : C.ja; ctx.fillRect(x, y, cw, ch);
+      ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(x, y, 10, ch);
+      ctx.fillStyle = '#fff'; ctx.font = `800 ${Math.round(cw / 7.5)}px ${FONT}`; ctx.textAlign = 'center';
+      const lines = wrap(ctx, b.title, cw - 30, 4);
+      const lh = Math.round(cw / 6.2), y0 = y + ch / 2 - (lines.length - 1) * lh / 2 + lh / 3;
+      lines.forEach((t, k) => ctx.fillText(t, x + cw / 2 + 5, y0 + k * lh));
+    }
+    ctx.restore();
+  });
+  if (d.books.length > books.length) {
+    ctx.fillStyle = C.sub; ctx.font = `700 30px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText(`ほか ${d.books.length - books.length}冊`, W / 2, 1285);
+  }
+  footer(ctx, W, 1325);
+}
+
+/**
+ * 節目のお祝い（英語 10万語達成 など）
+ * @param {object} m { label: '英語 100,000語', date: '2026-11-03', name, sub }
+ */
+export async function renderMilestoneImage(canvas, m) {
+  try { await document.fonts.load(`700 40px "M PLUS Rounded 1c"`); } catch { /* システムフォントで代用 */ }
+  const W = 1080, H = 1350;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  background(ctx, W, H);
+  // 紙吹雪
+  const conf = [C.en, C.ja, C.accent, '#f4c542', '#e86a8f'];
+  for (let i = 0; i < 70; i++) {
+    const x = (i * 157) % W, y = 60 + ((i * 263) % 520);
+    ctx.save(); ctx.translate(x, y); ctx.rotate((i * 37) % 360 * Math.PI / 180);
+    ctx.fillStyle = conf[i % conf.length]; ctx.globalAlpha = 0.7; ctx.fillRect(-9, -4, 18, 8); ctx.restore();
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'center';
+  ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`; ctx.fillText(`📚 ${CONFIG.appName}`, W / 2, 110);
+  ctx.font = `160px ${FONT}`; ctx.fillText('🎉', W / 2, 420);
+  roundRect(ctx, 90, 490, W - 180, 470, 40); ctx.fillStyle = C.card; ctx.fill();
+  ctx.fillStyle = C.ink; ctx.font = `800 52px ${FONT}`;
+  ctx.fillText(m.name ? `${m.name}が` : 'ついに', W / 2, 590);
+  let size = 110; ctx.font = `800 ${size}px ${FONT}`;
+  while (ctx.measureText(m.label).width > W - 260 && size > 60) { size -= 4; ctx.font = `800 ${size}px ${FONT}`; }
+  ctx.fillStyle = m.lang === 'en' ? C.en : C.ja; ctx.fillText(m.label, W / 2, 740);
+  ctx.fillStyle = C.ink; ctx.font = `800 64px ${FONT}`; ctx.fillText('達成！', W / 2, 850);
+  const [y, mo, dd] = m.date.split('-').map(Number);
+  ctx.fillStyle = C.sub; ctx.font = `700 32px ${FONT}`; ctx.fillText(`${y}年${mo}月${dd}日`, W / 2, 920);
+  if (m.sub) { ctx.fillStyle = C.accent; ctx.font = `800 40px ${FONT}`; ctx.fillText(m.sub, W / 2, 1080); }
+  footer(ctx, W, 1300);
 }
 
 export function canvasToFile(canvas, name = 'tadoku.png') {

@@ -3,7 +3,7 @@ import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
 import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib } from './books.js';
 import { IsbnScanner } from './scanner.js';
-import { renderShareImage, canvasToFile } from './share.js';
+import { renderShareImage, renderShelfImage, renderMilestoneImage, canvasToFile } from './share.js';
 
 // ---------------- 状態 ----------------
 let state = loadState();
@@ -26,7 +26,7 @@ function toast(msg) {
 
 const sync = new DriveSync(updateSyncUi);
 const getState = () => state;
-const setState = (s) => { state = s; saveLocal(state); render(); };
+const setState = (s) => { state = s; saveLocal(state); render(); setTimeout(() => checkMilestones(true), 0); };
 
 function commit() {
   saveLocal(state);
@@ -858,6 +858,7 @@ function saveForm(e) {
   commit();
   renderDay();
   toast(editing ? '更新しました' : (lang === 'en' ? `📘 +${fmt(count * data.times)}語 記録しました！` : '📕 記録しました！'));
+  checkMilestones(true);
   editing = null;
   maybeSilentSync();
 }
@@ -901,10 +902,30 @@ async function openScan() {
 }
 
 // ---------------- シェア ----------------
-async function openShare() {
+let shareKind = 'cal', shareMs = null; // 画像の種類（カレンダー／本棚）、節目のお祝いを出しているときはその節目
+async function openShare(ms = null) {
+  shareMs = ms;
   $('#shareName').checked = !!state.settings.shareShowName;
-  $('#shareDlg').showModal();
+  $('#shareTitle').textContent = ms ? 'おめでとう！' : 'シェア';
+  $('#shareKinds').hidden = !!ms;
+  $('#msHead').hidden = !ms;
+  if (ms) {
+    const [y, m, d] = ms.date.split('-').map(Number);
+    $('#msHead').innerHTML = `🎉 ${esc(ms.label)} 達成！<small>${y}年${m}月${d}日に達成しました</small>`;
+  }
+  if (!$('#shareDlg').open) $('#shareDlg').showModal();
   await drawShare();
+}
+// 本棚の画像に並べる本（その月に読んだ本。同じ本は1冊にまとめ、新しい順）
+function shelfBooks(mLogs) {
+  const seen = new Set(), out = [];
+  for (const l of mLogs.slice().sort((a, b) => (a.date < b.date ? 1 : -1))) {
+    const k = l.isbn || l.lang + l.title;
+    if (seen.has(k)) continue; seen.add(k);
+    const p = l.pid ? PRESET_BY_PID.get(l.pid) : null;
+    out.push({ title: l.title, lang: l.lang, cover: withIsbnCovers(l.cover || (p ? cachedCover(p.pid) : '') || '', l.isbn || p?.isbn) });
+  }
+  return out;
 }
 function shareData() {
   const logs = logsFor();
@@ -915,18 +936,67 @@ function shareData() {
   for (const [date, ls] of byDay(mLogs)) days.set(+date.slice(8), aggregate(ls));
   const a = activeChild();
   const name = $('#shareName').checked && a !== 'all' ? children().find((c) => c.id === a)?.name : '';
-  return { only: langMode() === 'both' ? '' : langMode(), year: viewY, month: viewM + 1, name, enWords: m.en, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days };
+  return { only: langMode() === 'both' ? '' : langMode(), year: viewY, month: viewM + 1, name, enWords: m.en, enBooks: m.enBooks, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days, books: shelfBooks(mLogs) };
 }
 async function drawShare() {
   const d = shareData();
-  await renderShareImage($('#shareCanvas'), d);
-  const body = d.only === 'ja' ? `日本語 ${fmt(d.jaBooks)}冊（累計 ${fmt(d.totalJa)}冊）`
-    : d.only === 'en' ? `英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`
-    : `日本語 ${fmt(d.jaBooks)}冊、英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`;
-  const text = `${d.month}月の読書きろく：${body}📚\n#${CONFIG.hashtags.join(' #')}`;
+  let text;
+  if (shareMs) {
+    await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: d.name });
+    text = `${d.name ? d.name + 'が' : ''}${shareMs.label}を達成しました！🎉\n#${CONFIG.hashtags.join(' #')}`;
+  } else {
+    if (shareKind === 'shelf') await renderShelfImage($('#shareCanvas'), d);
+    else await renderShareImage($('#shareCanvas'), d);
+    const body = d.only === 'ja' ? `日本語 ${fmt(d.jaBooks)}冊（累計 ${fmt(d.totalJa)}冊）`
+      : d.only === 'en' ? `英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`
+      : `日本語 ${fmt(d.jaBooks)}冊、英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`;
+    text = `${d.month}月の読書きろく：${body}📚\n#${CONFIG.hashtags.join(' #')}`;
+  }
   $('#shareX').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(CONFIG.shareUrl)}`;
   $('#shareLine').href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(CONFIG.shareUrl)}&text=${encodeURIComponent(text)}`;
   $('#shareNative').dataset.text = text;
+}
+
+// ---------------- 節目のお祝い（英語10万語・日本語100冊 など） ----------------
+// 記録を日付の順に足していき、節目を超えた記録の日付を「達成した日」とする。
+// お祝いした節目は読む人ごとに child.ms に覚える（Googleドライブにも同期され、別の端末で二重に出ない）
+const MS = {
+  en: { n: [1000, 5000, 10000, 30000, 50000, 100000, 200000, 300000, 500000, 1e6, 2e6, 3e6, 5e6, 1e7], label: (v) => `英語 ${fmt(v)}語` },
+  enBooks: { n: [10, 50, 100, 200, 300, 500, 1000, 2000, 3000, 5000], label: (v) => `英語の本 ${fmt(v)}冊` },
+  jaBooks: { n: [10, 50, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000], label: (v) => `日本語の本 ${fmt(v)}冊` },
+};
+function achievedMilestones(cid) {
+  const logs = state.logs.filter((l) => !l.deleted && l.childId === cid)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt || 0) - (b.createdAt || 0)));
+  const sum = { en: 0, enBooks: 0, jaBooks: 0 }, out = [];
+  for (const l of logs) {
+    const t = l.times || 1, before = { ...sum };
+    if (l.lang === 'en') { sum.en += countOf(l) * t; sum.enBooks += t; } else sum.jaBooks += t;
+    for (const k of Object.keys(MS)) for (const v of MS[k].n) if (before[k] < v && sum[k] >= v) {
+      out.push({ key: `${k}:${v}`, kind: k, value: v, date: l.date, lang: k === 'jaBooks' ? 'ja' : 'en', label: MS[k].label(v) });
+    }
+  }
+  return out;
+}
+// celebrate=false のときは、超えている節目を「済み」にするだけ（機能を入れた時点の記録や、見本のデータ）
+function checkMilestones(celebrate = true) {
+  let changed = false, show = null;
+  for (const c of children()) {
+    const got = achievedMilestones(c.id).filter((m) => langOk(m.lang));
+    const first = !c.ms;
+    c.ms ||= {};
+    const fresh = got.filter((m) => !c.ms[m.key]);
+    if (!fresh.length) { if (first) { c.updatedAt = Date.now(); changed = true; } continue; }
+    for (const m of fresh) c.ms[m.key] = m.date;
+    c.updatedAt = Date.now(); changed = true;
+    if (celebrate && !first && !c.model && c.id === activeChild()) {
+      // いちばん大きい節目を1つだけ（語数 → 英語の冊数 → 日本語の冊数の順で優先）
+      const order = ['en', 'enBooks', 'jaBooks'];
+      show = fresh.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || b.value - a.value)[0];
+    }
+  }
+  if (changed) { saveLocal(state); sync.schedule(getState, setState); }
+  if (show) setTimeout(() => openShare(show), 600);
 }
 
 // ---------------- 設定 ----------------
@@ -1115,7 +1185,8 @@ function bind() {
   $('#enChart').addEventListener('click', showChartTip);
   $('#enChart').addEventListener('pointerleave', () => { $('#chartTip').hidden = true; });
   $('#recoTabs').addEventListener('change', (e) => { recoLang = e.target.value; renderReco(); });
-  $('#shareOpen').onclick = openShare;
+  $('#shareOpen').onclick = () => openShare();
+  $('#shareKinds').addEventListener('change', (e) => { shareKind = e.target.value; drawShare(); });
   $('#shareName').onchange = () => { state.settings.shareShowName = $('#shareName').checked; saveLocal(state); drawShare(); };
   $('#shareSave').onclick = async () => {
     const f = await canvasToFile($('#shareCanvas'), `tadoku-${viewY}-${pad(viewM + 1)}.png`);
@@ -1249,6 +1320,7 @@ async function backfillTargets() {
 
 bind();
 render();
+checkMilestones(true); // 別の端末の記録が同期されて節目を超えていたら、ここでお祝い（初めての人は「済み」にするだけ）
 setTimeout(backfillTargets, 1500);
 updateSyncUi(sync.linked ? 'stale' : 'off');
 autoHeight();

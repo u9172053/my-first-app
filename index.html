@@ -201,7 +201,12 @@
 <dialog id="shareDlg" class="sheet">
   <div class="sheet-head">
     <button class="icon-btn" data-close aria-label="閉じる">✕</button>
-    <h3>シェア</h3><span></span>
+    <h3 id="shareTitle">シェア</h3><span></span>
+  </div>
+  <div id="msHead" class="ms-head" hidden></div>
+  <div class="seg share-kinds" id="shareKinds" role="radiogroup" aria-label="画像の種類">
+    <label><input type="radio" name="shareKind" value="cal" checked><span>📅 カレンダー</span></label>
+    <label><input type="radio" name="shareKind" value="shelf"><span>📚 本棚</span></label>
   </div>
   <label class="check"><input type="checkbox" id="shareName"> 名前を画像に入れる</label>
   <canvas id="shareCanvas" class="share-canvas"></canvas>
