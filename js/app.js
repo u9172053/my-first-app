@@ -3,7 +3,7 @@ import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
 import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib } from './books.js';
 import { IsbnScanner } from './scanner.js';
-import { renderShelfImage, renderMilestoneImage, renderGrowthImage, canvasToFile } from './share.js';
+import { renderShelfImage, renderMilestoneImage, renderGrowthImage, renderAgeImage, canvasToFile } from './share.js';
 
 // ---------------- 状態 ----------------
 let state = loadState();
@@ -996,7 +996,8 @@ function shelfBooks(mLogs) {
     const k = l.isbn || l.lang + l.title;
     if (seen.has(k)) continue; seen.add(k);
     const p = l.pid ? PRESET_BY_PID.get(l.pid) : null;
-    out.push({ title: l.title, lang: l.lang, cover: withIsbnCovers(l.cover || (p ? cachedCover(p.pid) : '') || '', l.isbn || p?.isbn) });
+    const isbn = l.isbn || p?.isbn || '';
+    out.push({ title: l.title, lang: l.lang, isbn, cover: withIsbnCovers(l.cover || (p ? cachedCover(p.pid) : '') || '', isbn) });
   }
   return out;
 }
@@ -1022,6 +1023,25 @@ function growthData() {
     .map((m) => ({ ...m, lang: m.kind === 'en' ? 'en' : 'ja', short: m.kind === 'en' ? `${axisNum(m.value)}語` : `${fmt(m.value)}冊` }));
   return { start: months[0].key, end: months[months.length - 1].key, months, totalEn: en, totalJa: ja, enBooks, ms, only: langMode() === 'both' ? '' : langMode() };
 }
+// 対象年齢のあゆみ（最初の記録から今まで。1冊ずつの点と、直近の平均の線）
+function ageShareData() {
+  const pts = logsFor().map((l) => ({ l, age: logAge(l) })).filter((p) => p.age != null)
+    .sort((a, b) => (a.l.date < b.l.date ? -1 : a.l.date > b.l.date ? 1 : 0));
+  const now = `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
+  const first = pts[0]?.l.date.slice(0, 7) || now, lastLog = pts[pts.length - 1]?.l.date.slice(0, 7) || now;
+  const end = lastLog > now ? lastLog : now;
+  const [y0, m0] = first.split('-').map(Number), [y1, m1] = end.split('-').map(Number);
+  const t0 = new Date(y0, m0 - 1, 1), t1 = new Date(y1, m1, 1), span = t1 - t0 || 1;
+  const pos = (date) => (new Date(date) - t0) / span;
+  const win = Math.max(8, Math.round(pts.length / 40)), trend = {}, nowAvg = {};
+  for (const lang of ['ja', 'en']) {
+    const ps = pts.filter((p) => p.l.lang === lang);
+    trend[lang] = ps.map((p, i) => { const w = ps.slice(Math.max(0, i - win + 1), i + 1); return { t: pos(p.l.date), age: w.reduce((s, q) => s + q.age, 0) / w.length }; });
+    const last = ps.slice(-win);
+    nowAvg[lang] = last.length ? Math.round(last.reduce((s, q) => s + q.age, 0) / last.length) : null;
+  }
+  return { start: first, end, pts: pts.map((p) => ({ t: pos(p.l.date), age: p.age, lang: p.l.lang })), trend, now: nowAvg, only: langMode() === 'both' ? '' : langMode() };
+}
 function shareData() {
   const logs = logsFor();
   const prefix = `${viewY}-${pad(viewM + 1)}`;
@@ -1030,7 +1050,7 @@ function shareData() {
   const days = new Map();
   for (const [date, ls] of byDay(mLogs)) days.set(+date.slice(8), aggregate(ls));
   const name = ''; // SNS に出す画像に子どもの名前は入れない
-  return { only: langMode() === 'both' ? '' : langMode(), year: viewY, month: viewM + 1, name, enWords: m.en, enBooks: m.enBooks, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days, books: shelfBooks(mLogs) };
+  return { current: viewY === today.getFullYear() && viewM === today.getMonth(), only: langMode() === 'both' ? '' : langMode(), year: viewY, month: viewM + 1, name, enWords: m.en, enBooks: m.enBooks, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days, books: shelfBooks(mLogs) };
 }
 async function drawShare() {
   const d = shareData();
@@ -1039,10 +1059,15 @@ async function drawShare() {
     const age = $('#shareAge').checked ? ageAt(activeChild(), shareMs.date) : '';
     await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: '', sub: age ? `${age}で達成！` : '' });
     text = `${shareMs.label}を達成しました！🎉\n#${CONFIG.hashtags.join(' #')}`;
+  } else if (shareKind === 'age') {
+    const a = ageShareData();
+    await renderAgeImage($('#shareCanvas'), a);
+    const body = [a.only !== 'en' && a.now.ja != null ? `日本語 ${a.now.ja}歳〜` : '', a.only !== 'ja' && a.now.en != null ? `英語 ${a.now.en}歳〜` : ''].filter(Boolean).join('、');
+    text = `いま読んでいる本の対象年齢：${body || '記録中'}📚\n#${CONFIG.hashtags.join(' #')}`;
   } else if (shareKind === 'shelf') {
     await renderShelfImage($('#shareCanvas'), d);
     const body = [d.only !== 'en' && d.jaBooks ? `日本語 ${fmt(d.jaBooks)}冊` : '', d.only !== 'ja' && d.enBooks ? `英語 ${fmt(d.enBooks)}冊・${fmt(d.enWords)}語` : ''].filter(Boolean).join('、');
-    text = `${d.month}月の本棚：${body || '読んだ本'}📚\n#${CONFIG.hashtags.join(' #')}`;
+    text = `${d.current ? '今月' : d.month + '月'}の本棚：${body || '読んだ本'}📚\n#${CONFIG.hashtags.join(' #')}`;
   } else {
     const g = growthData();
     await renderGrowthImage($('#shareCanvas'), g);

@@ -2,6 +2,7 @@
 //  SNSシェア用の画像（1080×1350）を作成
 // ============================================================
 import { CONFIG } from './config.js';
+import { searchGoogleBooks } from './books.js';
 
 const FONT = '"M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", "Yu Gothic", "Meiryo", sans-serif';
 const C = { bg: '#fff8ee', card: '#ffffff', ink: '#3b2f2a', sub: '#8a7a70', en: '#2f7fd8', ja: '#ee8a2a', line: '#f0e2d0', accent: '#5bb48c' };
@@ -111,11 +112,19 @@ function wrap(ctx, text, maxW, lines) {
   return out;
 }
 // 表紙の画像を読み込む（候補を順に試す。別サイトの画像は CORS が許可されていないと画像に描けないので、だめなら null）
-function loadCover(urls) {
-  const list = String(urls || '').split('|').filter((u) => /^https?:/.test(u));
+// 版元ドットコム・国会図書館の表紙は許可がないので、描けなければ Google Books（許可あり）で ISBN から探し直す
+async function googleCover(isbn) {
+  if (!/^97[89]\d{10}$/.test(isbn || '')) return '';
+  try { return ((await searchGoogleBooks(`isbn:${isbn}`))[0]?.cover || '').replace(/&edge=curl/, ''); } catch { return ''; }
+}
+function loadCover(urls, isbn) {
+  const list = String(urls || '').split('|').filter((u) => /^https?:/.test(u) && !/ndlsearch|cover\.openbd/.test(u));
+  let triedGoogle = false;
   return new Promise((res) => {
-    const next = () => {
-      const u = list.shift(); if (!u) return res(null);
+    const next = async () => {
+      let u = list.shift();
+      if (!u && !triedGoogle) { triedGoogle = true; u = await googleCover(isbn); if (u) u = u.replace(/^http:/, 'https:'); }
+      if (!u) return res(null);
       const img = new Image(); img.crossOrigin = 'anonymous'; img.referrerPolicy = 'no-referrer';
       const t = setTimeout(() => { img.src = ''; next(); }, 6000);
       img.onload = () => { clearTimeout(t); if (img.naturalWidth < 40) next(); else res(img); };
@@ -139,7 +148,7 @@ export async function renderShelfImage(canvas, d) {
   ctx.textAlign = 'center';
   ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`; ctx.fillText(`📚 ${CONFIG.appName}`, W / 2, 100);
   ctx.fillStyle = C.ink; ctx.font = `800 60px ${FONT}`;
-  ctx.fillText(`${d.year}年${d.month}月${d.name ? ' ' + d.name + 'の' : 'の'}本棚`, W / 2, 185);
+  ctx.fillText(d.current ? '今月の本棚' : `${d.year}年${d.month}月の本棚`, W / 2, 185);
   const parts = [];
   if (d.only !== 'en' && d.jaBooks) parts.push(`日本語 ${fmt(d.jaBooks)}冊`);
   if (d.only !== 'ja' && d.enBooks) parts.push(`英語 ${fmt(d.enBooks)}冊・${fmt(d.enWords)}語`);
@@ -150,7 +159,7 @@ export async function renderShelfImage(canvas, d) {
   const rows = Math.max(1, Math.ceil(books.length / cols));
   const gx = 70, gy = 300, gw = W - 140, gh = 960, gap = 22;
   const cw = (gw - gap * (cols - 1)) / cols, ch = Math.min(cw * 1.38, (gh - gap * (rows - 1)) / rows);
-  const imgs = await Promise.all(books.map((b) => loadCover(b.cover)));
+  const imgs = await Promise.all(books.map((b) => loadCover(b.cover, b.isbn)));
   books.forEach((b, i) => {
     const r = Math.floor(i / cols), c = i % cols;
     const x = gx + c * (cw + gap), y = gy + r * (ch + gap);
@@ -240,6 +249,66 @@ export async function renderGrowthImage(canvas, g) {
       }
     }
   });
+  ctx.textAlign = 'center';
+  footer(ctx, W, 1305);
+}
+
+/**
+ * 読んでいる本の対象年齢のあゆみ：1冊ずつの点と、直近の平均の線（日本語・英語）
+ * @param {object} a { start:'2022-04', end:'2026-11', pts:[{t: 0〜1 の位置, age, lang}], trend:{ja:[{t,age}], en:[...]}, now:{ja, en}, only }
+ */
+export async function renderAgeImage(canvas, a) {
+  try { await document.fonts.load(`700 40px "M PLUS Rounded 1c"`); } catch { /* システムフォントで代用 */ }
+  const W = 1080, H = 1350;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  background(ctx, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`; ctx.fillText(`📚 ${CONFIG.appName}`, W / 2, 100);
+  ctx.fillStyle = C.ink; ctx.font = `800 58px ${FONT}`; ctx.fillText('読んでいる本の対象年齢', W / 2, 185);
+  const [sy, sm] = a.start.split('-').map(Number), [ey, em] = a.end.split('-').map(Number);
+  ctx.fillStyle = C.sub; ctx.font = `700 32px ${FONT}`; ctx.fillText(`${sy}年${sm}月〜${ey}年${em}月`, W / 2, 240);
+  // 今の平均（直近の本）
+  const cards = [];
+  if (a.only !== 'en' && a.now.ja != null) cards.push(['にほんご', C.ja, a.now.ja]);
+  if (a.only !== 'ja' && a.now.en != null) cards.push(['English', C.en, a.now.en]);
+  const cw = (W - 140 - 30 * (cards.length - 1)) / Math.max(1, cards.length);
+  cards.forEach(([label, color, age], i) => {
+    const x = 70 + i * (cw + 30);
+    roundRect(ctx, x, 275, cw, 180, 30); ctx.fillStyle = C.card; ctx.fill();
+    ctx.fillStyle = color; ctx.font = `800 30px ${FONT}`; ctx.fillText(label, x + cw / 2, 318);
+    ctx.fillStyle = C.ink; ctx.font = `800 64px ${FONT}`; ctx.fillText(`${age}歳〜`, x + cw / 2, 390);
+    ctx.fillStyle = C.sub; ctx.font = `700 22px ${FONT}`; ctx.fillText('いま読んでいる本の平均', x + cw / 2, 432);
+  });
+  // グラフ
+  const gx0 = 150, gx1 = W - 100, gy0 = 520, gy1 = 1180;
+  roundRect(ctx, 70, 480, W - 140, 760, 36); ctx.fillStyle = C.card; ctx.fill();
+  const maxAge = Math.max(6, ...a.pts.map((p) => p.age));
+  const max = Math.ceil((maxAge + 1) / 2) * 2;
+  const X = (t) => gx0 + (gx1 - gx0) * t, Y = (v) => gy1 - (gy1 - gy0) * (v / max);
+  const step = max <= 8 ? 2 : max <= 12 ? 4 : 6;
+  ctx.textAlign = 'right'; ctx.font = `700 26px ${FONT}`;
+  for (let v = 0; v <= max; v += step) {
+    ctx.strokeStyle = C.line; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(gx0, Y(v)); ctx.lineTo(gx1, Y(v)); ctx.stroke();
+    ctx.fillStyle = C.sub; ctx.fillText(`${v}歳`, gx0 - 14, Y(v) + 9);
+  }
+  ctx.textAlign = 'left'; ctx.fillText(`${sy}年${sm}月`, gx0, gy1 + 44);
+  ctx.textAlign = 'right'; ctx.fillText(`${ey}年${em}月`, gx1, gy1 + 44);
+  const r = a.pts.length > 300 ? 4 : 7;
+  ctx.globalAlpha = a.pts.length > 300 ? 0.45 : 0.8;
+  for (const p of a.pts) {
+    if (a.only && p.lang !== a.only) continue;
+    ctx.fillStyle = p.lang === 'en' ? C.en : C.ja;
+    if (p.lang === 'en') ctx.fillRect(X(p.t) - r, Y(p.age) - r, r * 2, r * 2);
+    else { ctx.beginPath(); ctx.arc(X(p.t), Y(p.age), r, 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.globalAlpha = 1;
+  for (const lang of ['ja', 'en']) {
+    const tr = a.trend[lang]; if (!tr || tr.length < 2 || (a.only && a.only !== lang)) continue;
+    ctx.beginPath(); tr.forEach((p, i) => (i ? ctx.lineTo(X(p.t), Y(p.age)) : ctx.moveTo(X(p.t), Y(p.age))));
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 12; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.strokeStyle = lang === 'en' ? C.en : C.ja; ctx.lineWidth = 6; ctx.stroke();
+  }
   ctx.textAlign = 'center';
   footer(ctx, W, 1305);
 }
