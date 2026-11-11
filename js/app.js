@@ -977,6 +977,8 @@ let shareKind = 'cal', shareMs = null; // 画像の種類（カレンダー／�
 async function openShare(ms = null) {
   shareMs = ms;
   $('#shareName').checked = !!state.settings.shareShowName;
+  $('#shareAge').checked = !!state.settings.shareShowAge; // 年齢は初めはオフ（SNS で子どもの年齢が分からないように）
+  $('#shareAgeRow').hidden = !(ms && ageAt(activeChild(), ms.date));
   $('#shareTitle').textContent = ms ? 'おめでとう！' : 'シェア';
   $('#shareKinds').hidden = !!ms;
   $('#msHead').hidden = !ms;
@@ -1014,7 +1016,7 @@ async function drawShare() {
   const d = shareData();
   let text;
   if (shareMs) {
-    const age = ageAt(activeChild(), shareMs.date);
+    const age = $('#shareAge').checked ? ageAt(activeChild(), shareMs.date) : '';
     await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: d.name, sub: age ? `${age}で達成！` : '' });
     text = `${d.name ? d.name + 'が' : ''}${shareMs.label}を達成しました！🎉\n#${CONFIG.hashtags.join(' #')}`;
   } else {
@@ -1263,6 +1265,7 @@ function bind() {
   $('#shareOpen').onclick = () => openShare();
   $('#shareKinds').addEventListener('change', (e) => { shareKind = e.target.value; drawShare(); });
   $('#shareName').onchange = () => { state.settings.shareShowName = $('#shareName').checked; saveLocal(state); drawShare(); };
+  $('#shareAge').onchange = () => { state.settings.shareShowAge = $('#shareAge').checked; saveLocal(state); drawShare(); };
   $('#shareSave').onclick = async () => {
     const f = await canvasToFile($('#shareCanvas'), `tadoku-${viewY}-${pad(viewM + 1)}.png`);
     const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name; a.click();
