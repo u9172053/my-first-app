@@ -87,7 +87,7 @@
     <div class="sec-head">
       <h2>🎉 SNSでシェア</h2>
     </div>
-    <p class="muted">今月の記録を画像にしてシェアできます。</p>
+    <p class="muted">これまでの読書のあゆみや、今月読んだ本の表紙を画像にしてシェアできます。</p>
     <button id="shareOpen" class="btn primary wide">シェア画像をつくる</button>
   </section>
 
@@ -206,10 +206,9 @@
   </div>
   <div id="msHead" class="ms-head" hidden></div>
   <div class="seg share-kinds" id="shareKinds" role="radiogroup" aria-label="画像の種類">
-    <label><input type="radio" name="shareKind" value="cal" checked><span>📅 カレンダー</span></label>
+    <label><input type="radio" name="shareKind" value="growth" checked><span>📈 これまでの推移</span></label>
     <label><input type="radio" name="shareKind" value="shelf"><span>📚 本棚</span></label>
   </div>
-  <label class="check"><input type="checkbox" id="shareName"> 名前を画像に入れる</label>
   <label class="check" id="shareAgeRow" hidden><input type="checkbox" id="shareAge"> 年齢を画像に入れる</label>
   <canvas id="shareCanvas" class="share-canvas"></canvas>
   <div class="share-btns">

@@ -3,7 +3,7 @@ import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
 import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib } from './books.js';
 import { IsbnScanner } from './scanner.js';
-import { renderShareImage, renderShelfImage, renderMilestoneImage, canvasToFile } from './share.js';
+import { renderShelfImage, renderMilestoneImage, renderGrowthImage, canvasToFile } from './share.js';
 
 // ---------------- 状態 ----------------
 let state = loadState();
@@ -973,10 +973,9 @@ async function openScan() {
 }
 
 // ---------------- シェア ----------------
-let shareKind = 'cal', shareMs = null; // 画像の種類（カレンダー／本棚）、節目のお祝いを出しているときはその節目
+let shareKind = 'growth', shareMs = null; // 画像の種類（カレンダー／本棚）、節目のお祝いを出しているときはその節目
 async function openShare(ms = null) {
   shareMs = ms;
-  $('#shareName').checked = !!state.settings.shareShowName;
   $('#shareAge').checked = !!state.settings.shareShowAge; // 年齢は初めはオフ（SNS で子どもの年齢が分からないように）
   $('#shareAgeRow').hidden = !(ms && ageAt(activeChild(), ms.date));
   $('#shareTitle').textContent = ms ? 'おめでとう！' : 'シェア';
@@ -1001,6 +1000,28 @@ function shelfBooks(mLogs) {
   }
   return out;
 }
+// これまでの推移：始めた月から今月（か最後の記録の月）までの、月ごとの累計
+function growthData() {
+  const logs = logsFor();
+  const now = `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
+  const first = logs.reduce((m, l) => (!m || l.date < m ? l.date : m), '') || `${now}-01`;
+  const last = logs.reduce((m, l) => (l.date > m ? l.date : m), first).slice(0, 7);
+  const end = last > now ? last : now;
+  const [y0, m0] = first.split('-').map(Number);
+  const months = []; let en = 0, ja = 0, enBooks = 0;
+  for (let d = new Date(y0, m0 - 1, 1); ; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+    const key = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+    for (const l of logs) if (l.date.startsWith(key)) {
+      const t = l.times || 1;
+      if (l.lang === 'en') { en += countOf(l) * t; enBooks += t; } else ja += t;
+    }
+    months.push({ key, en, ja });
+    if (key >= end || months.length > 600) break;
+  }
+  const ms = achievedMilestones(activeChild()).filter((m) => m.kind !== 'enBooks')
+    .map((m) => ({ ...m, lang: m.kind === 'en' ? 'en' : 'ja', short: m.kind === 'en' ? `${axisNum(m.value)}語` : `${fmt(m.value)}冊` }));
+  return { start: months[0].key, end: months[months.length - 1].key, months, totalEn: en, totalJa: ja, enBooks, ms, only: langMode() === 'both' ? '' : langMode() };
+}
 function shareData() {
   const logs = logsFor();
   const prefix = `${viewY}-${pad(viewM + 1)}`;
@@ -1008,8 +1029,7 @@ function shareData() {
   const m = aggregate(mLogs);
   const days = new Map();
   for (const [date, ls] of byDay(mLogs)) days.set(+date.slice(8), aggregate(ls));
-  const a = activeChild();
-  const name = $('#shareName').checked && a !== 'all' ? children().find((c) => c.id === a)?.name : '';
+  const name = ''; // SNS に出す画像に子どもの名前は入れない
   return { only: langMode() === 'both' ? '' : langMode(), year: viewY, month: viewM + 1, name, enWords: m.en, enBooks: m.enBooks, jaBooks: m.jaBooks, jaChars: m.jaChars, totalEn: aggregate(logs).en, totalJa: aggregate(logs).jaBooks, readDays: days.size, days, books: shelfBooks(mLogs) };
 }
 async function drawShare() {
@@ -1017,15 +1037,17 @@ async function drawShare() {
   let text;
   if (shareMs) {
     const age = $('#shareAge').checked ? ageAt(activeChild(), shareMs.date) : '';
-    await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: d.name, sub: age ? `${age}で達成！` : '' });
-    text = `${d.name ? d.name + 'が' : ''}${shareMs.label}を達成しました！🎉\n#${CONFIG.hashtags.join(' #')}`;
+    await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: '', sub: age ? `${age}で達成！` : '' });
+    text = `${shareMs.label}を達成しました！🎉\n#${CONFIG.hashtags.join(' #')}`;
+  } else if (shareKind === 'shelf') {
+    await renderShelfImage($('#shareCanvas'), d);
+    const body = [d.only !== 'en' && d.jaBooks ? `日本語 ${fmt(d.jaBooks)}冊` : '', d.only !== 'ja' && d.enBooks ? `英語 ${fmt(d.enBooks)}冊・${fmt(d.enWords)}語` : ''].filter(Boolean).join('、');
+    text = `${d.month}月の本棚：${body || '読んだ本'}📚\n#${CONFIG.hashtags.join(' #')}`;
   } else {
-    if (shareKind === 'shelf') await renderShelfImage($('#shareCanvas'), d);
-    else await renderShareImage($('#shareCanvas'), d);
-    const body = d.only === 'ja' ? `日本語 ${fmt(d.jaBooks)}冊（累計 ${fmt(d.totalJa)}冊）`
-      : d.only === 'en' ? `英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`
-      : `日本語 ${fmt(d.jaBooks)}冊、英語 ${fmt(d.enWords)}語（累計 ${fmt(d.totalEn)}語）`;
-    text = `${d.month}月の読書きろく：${body}📚\n#${CONFIG.hashtags.join(' #')}`;
+    const g = growthData();
+    await renderGrowthImage($('#shareCanvas'), g);
+    const body = [g.only !== 'ja' ? `英語 ${fmt(g.totalEn)}語` : '', g.only !== 'en' ? `日本語 ${fmt(g.totalJa)}冊` : ''].filter(Boolean).join('、');
+    text = `これまでの読書のあゆみ：${body}📚\n#${CONFIG.hashtags.join(' #')}`;
   }
   $('#shareX').href = `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(CONFIG.shareUrl)}`;
   $('#shareLine').href = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(CONFIG.shareUrl)}&text=${encodeURIComponent(text)}`;
@@ -1264,7 +1286,6 @@ function bind() {
   $('#recoTabs').addEventListener('change', (e) => { recoLang = e.target.value; renderReco(); });
   $('#shareOpen').onclick = () => openShare();
   $('#shareKinds').addEventListener('change', (e) => { shareKind = e.target.value; drawShare(); });
-  $('#shareName').onchange = () => { state.settings.shareShowName = $('#shareName').checked; saveLocal(state); drawShare(); };
   $('#shareAge').onchange = () => { state.settings.shareShowAge = $('#shareAge').checked; saveLocal(state); drawShare(); };
   $('#shareSave').onclick = async () => {
     const f = await canvasToFile($('#shareCanvas'), `tadoku-${viewY}-${pad(viewM + 1)}.png`);

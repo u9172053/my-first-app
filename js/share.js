@@ -180,6 +180,71 @@ export async function renderShelfImage(canvas, d) {
 }
 
 /**
+ * これまでの推移：始めた月から今月までの、英語の語数・日本語の冊数の累計（節目の印つき）
+ * @param {object} g { start:'2022-04', end:'2026-11', months:[{key, y, m, en, ja}], totalEn, totalJa, enBooks, ms:[{key,lang,label}], only }
+ */
+export async function renderGrowthImage(canvas, g) {
+  try { await document.fonts.load(`700 40px "M PLUS Rounded 1c"`); } catch { /* システムフォントで代用 */ }
+  const W = 1080, H = 1350;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  background(ctx, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = C.sub; ctx.font = `700 34px ${FONT}`; ctx.fillText(`📚 ${CONFIG.appName}`, W / 2, 100);
+  ctx.fillStyle = C.ink; ctx.font = `800 64px ${FONT}`; ctx.fillText('読書のあゆみ', W / 2, 190);
+  const [sy, sm] = g.start.split('-').map(Number), [ey, em] = g.end.split('-').map(Number);
+  const months = (ey - sy) * 12 + (em - sm) + 1;
+  const span = months >= 12 ? `${Math.floor(months / 12)}年${months % 12 ? `${months % 12}か月` : ''}` : `${months}か月`;
+  ctx.fillStyle = C.sub; ctx.font = `700 32px ${FONT}`; ctx.fillText(`${sy}年${sm}月〜${ey}年${em}月（${span}）`, W / 2, 245);
+  const panels = [];
+  if (g.only !== 'ja') panels.push({ lang: 'en', color: C.en, title: 'English', total: `${fmt(g.totalEn)}語`, sub: `${fmt(g.enBooks)}冊`, key: 'en' });
+  if (g.only !== 'en') panels.push({ lang: 'ja', color: C.ja, title: 'にほんご', total: `${fmt(g.totalJa)}冊`, sub: '', key: 'ja' });
+  const top = 290, bottom = 1240, gap = 30, ph = (bottom - top - gap * (panels.length - 1)) / panels.length;
+  panels.forEach((p, k) => {
+    const y0 = top + k * (ph + gap);
+    roundRect(ctx, 70, y0, W - 140, ph, 36); ctx.fillStyle = C.card; ctx.fill();
+    // 見出しと合計
+    ctx.textAlign = 'left'; ctx.fillStyle = p.color; ctx.font = `800 36px ${FONT}`; ctx.fillText(p.title, 110, y0 + 62);
+    ctx.textAlign = 'right'; ctx.fillStyle = C.ink; ctx.font = `800 58px ${FONT}`; ctx.fillText(p.total, W - 110, y0 + 70);
+    if (p.sub) { ctx.fillStyle = C.sub; ctx.font = `700 28px ${FONT}`; ctx.fillText(p.sub, W - 110, y0 + 108); }
+    // 折れ線（累計）
+    const cx0 = 110, cx1 = W - 110, cy0 = y0 + 130, cy1 = y0 + ph - 60;
+    const vals = g.months.map((m) => m[p.key]);
+    const max = Math.max(1, vals[vals.length - 1]);
+    const n = vals.length;
+    const X = (i) => cx0 + (cx1 - cx0) * (n === 1 ? 1 : i / (n - 1));
+    const Y = (v) => cy1 - (cy1 - cy0) * (v / max);
+    ctx.beginPath(); ctx.moveTo(X(0), cy1);
+    vals.forEach((v, i) => ctx.lineTo(X(i), Y(v)));
+    ctx.lineTo(X(n - 1), cy1); ctx.closePath();
+    ctx.globalAlpha = 0.14; ctx.fillStyle = p.color; ctx.fill(); ctx.globalAlpha = 1;
+    ctx.beginPath(); vals.forEach((v, i) => (i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v))));
+    ctx.strokeStyle = p.color; ctx.lineWidth = 7; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.strokeStyle = C.line; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cx0, cy1); ctx.lineTo(cx1, cy1); ctx.stroke();
+    // 横軸：始めた年と今年
+    ctx.fillStyle = C.sub; ctx.font = `700 26px ${FONT}`;
+    ctx.textAlign = 'left'; ctx.fillText(`${sy}年${sm}月`, cx0, cy1 + 38);
+    ctx.textAlign = 'right'; ctx.fillText(`${ey}年${em}月`, cx1, cy1 + 38);
+    // 節目の印（ラベルは重ならないものだけ）
+    const placed = [];
+    for (const m of g.ms.filter((x) => x.lang === p.lang).sort((a, b) => b.value - a.value)) {
+      const i = g.months.findIndex((mm) => mm.key === m.date.slice(0, 7)); if (i < 0) continue;
+      const x = X(i), y = Y(Math.min(m.value, max));
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = C.accent; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      if (placed.every((px) => Math.abs(px - x) > 190)) {
+        placed.push(x);
+        ctx.textAlign = x > cx1 - 120 ? 'right' : x < cx0 + 120 ? 'left' : 'center';
+        ctx.font = `800 28px ${FONT}`; ctx.lineWidth = 8; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#2f7a55';
+        ctx.strokeText(m.short, x, y - 24); ctx.fillText(m.short, x, y - 24);
+      }
+    }
+  });
+  ctx.textAlign = 'center';
+  footer(ctx, W, 1305);
+}
+
+/**
  * 節目のお祝い（英語 10万語達成 など）
  * @param {object} m { label: '英語 100,000語', date: '2026-11-03', name, sub }
  */
