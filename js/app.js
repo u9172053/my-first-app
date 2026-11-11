@@ -268,7 +268,12 @@ function renderCumChart() {
   const cid = activeChild();
   const ms = achievedMilestones(cid).filter((m) => m.kind === 'en');
   const idx = (date) => data.findIndex((d) => d.key === date.slice(0, 7));
-  const labeled = new Set(ms.slice().sort((a, b) => b.value - a.value).slice(0, 4).map((m) => m.key));
+  // ラベルは大きい節目から順に、ほかのラベルと横に 70 以上離れているものだけ（重なり防止）
+  const placed = [], labeled = new Set();
+  for (const m of ms.slice().sort((a, b) => b.value - a.value)) {
+    const i = idx(m.date); if (i < 0) continue;
+    if (placed.every((px) => Math.abs(px - x(i)) >= 70)) { placed.push(x(i)); labeled.add(m.key); }
+  }
   for (const m of ms) {
     const i = idx(m.date); if (i < 0) continue;
     const cx = x(i), cy = y(m.value);
@@ -1029,9 +1034,10 @@ async function drawShare() {
 // 記録を日付の順に足していき、節目を超えた記録の日付を「達成した日」とする。
 // お祝いした節目は読む人ごとに child.ms に覚える（Googleドライブにも同期され、別の端末で二重に出ない）
 const MS = {
-  en: { n: [1000, 5000, 10000, 30000, 50000, 100000, 200000, 300000, 500000, 1e6, 2e6, 3e6, 5e6, 1e7], label: (v) => `英語 ${fmt(v)}語` },
-  enBooks: { n: [10, 50, 100, 200, 300, 500, 1000, 2000, 3000, 5000], label: (v) => `英語の本 ${fmt(v)}冊` },
-  jaBooks: { n: [10, 50, 100, 200, 300, 500, 1000, 2000, 3000, 5000, 10000], label: (v) => `日本語の本 ${fmt(v)}冊` },
+  // すぐ届く小さな節目は出さない（お祝いの価値が下がり、グラフもごちゃつくので）
+  en: { n: [1e5, 3e5, 5e5, 1e6, 2e6, 3e6, 5e6, 1e7], label: (v) => `英語 ${axisNum(v)}語` },
+  enBooks: { n: [100, 500, 1000, 2000, 3000, 5000, 10000], label: (v) => `英語の本 ${fmt(v)}冊` },
+  jaBooks: { n: [100, 500, 1000, 2000, 3000, 5000, 10000], label: (v) => `日本語の本 ${fmt(v)}冊` },
 };
 function achievedMilestones(cid) {
   const logs = state.logs.filter((l) => !l.deleted && l.childId === cid)
