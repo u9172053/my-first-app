@@ -118,12 +118,14 @@ async function googleCover(isbn) {
   try { return ((await searchGoogleBooks(`isbn:${isbn}`))[0]?.cover || '').replace(/&edge=curl/, ''); } catch { return ''; }
 }
 function loadCover(urls, isbn) {
-  const list = String(urls || '').split('|').filter((u) => /^https?:/.test(u) && !/ndlsearch|cover\.openbd/.test(u));
+  // 画面の一覧で「許可の確認なし」に読み込んだ画像の控え（キャッシュ）が使われると描けないので、URL に目印を付けて別に取り直す
+  const bust = (u) => u + (u.includes('?') ? '&' : '?') + 'tadoku-cors=1';
+  const list = String(urls || '').split('|').filter((u) => /^https?:/.test(u)).map(bust);
   let triedGoogle = false;
   return new Promise((res) => {
     const next = async () => {
       let u = list.shift();
-      if (!u && !triedGoogle) { triedGoogle = true; u = await googleCover(isbn); if (u) u = u.replace(/^http:/, 'https:'); }
+      if (!u && !triedGoogle) { triedGoogle = true; u = await googleCover(isbn); if (u) u = bust(u.replace(/^http:/, 'https:')); }
       if (!u) return res(null);
       const img = new Image(); img.crossOrigin = 'anonymous'; img.referrerPolicy = 'no-referrer';
       const t = setTimeout(() => { img.src = ''; next(); }, 6000);
