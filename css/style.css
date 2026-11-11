@@ -299,3 +299,14 @@ body[data-only=ja] .both-only, body[data-only=en] .both-only { display: none !im
 .share-kinds input:checked + span { border-color: var(--accent); background: #eaf6ef; color: #2f7a55; font-weight: 700; }
 .ms-head { text-align: center; font-weight: 800; font-size: 18px; color: #2f7a55; background: #eaf6ef; border-radius: 14px; padding: 12px; margin-bottom: 10px; }
 .ms-head small { display: block; font-weight: 700; font-size: 12px; color: var(--sub); margin-top: 4px; }
+
+/* 英語の語数：すべて（累計） */
+#enChart .cum-area { fill: var(--en); opacity: .12; }
+#enChart .cum-line { fill: none; stroke: var(--en); stroke-width: 2.2; stroke-linejoin: round; }
+#enChart .ms-dot { fill: #fff; stroke: var(--accent); stroke-width: 2; }
+#enChart .ms-label { font-size: 9px; font-weight: 800; fill: #2f7a55; paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+.chart-tabs { flex-wrap: wrap; }
+.birth-l { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--sub); flex-basis: 100%; margin: 4px 0 0; }
+.birth-l input { width: auto; padding: 4px 8px; font-size: 13px; }
+.child-row { flex-wrap: wrap; }
+.chart-tabs span { font-size: 13px; padding: 9px 4px; }

@@ -158,6 +158,15 @@ function renderCalendar() {
 
 // ---------------- 英語の語数グラフ（棒グラフ） ----------------
 let chartMode = 'month';
+// 生まれた年月（設定で任意に入力、'YYYY-MM'）から、その日の年齢「5歳3か月」
+function ageAt(cid, date) {
+  const b = children().find((c) => c.id === cid)?.birth;
+  if (!b || !date) return '';
+  const [by, bm] = b.split('-').map(Number), [y, m] = date.split('-').map(Number);
+  const mo = (y - by) * 12 + (m - bm);
+  if (mo < 0) return '';
+  return `${Math.floor(mo / 12)}歳${mo % 12 ? `${mo % 12}か月` : ''}`;
+}
 const niceMax = (v) => {
   if (v <= 0) return 100;
   const p = 10 ** Math.floor(Math.log10(v)), n = v / p;
@@ -167,6 +176,21 @@ const axisNum = (v) => (v >= 10000 ? `${+(v / 10000).toFixed(1)}万` : fmt(v));
 
 function chartData() {
   const logs = logsFor().filter((l) => l.lang === 'en');
+  if (chartMode === 'all') {
+    // 最初の記録の月から、表示している月（か最後の記録の月）まで、語数の累計
+    if (!logs.length) return [];
+    const first = logs.reduce((m, l) => (l.date < m ? l.date : m), logs[0].date), last = logs.reduce((m, l) => (l.date > m ? l.date : m), logs[0].date);
+    const [y0, m0] = first.split('-').map(Number);
+    const lastKey = `${viewY}-${pad(viewM + 1)}` > last.slice(0, 7) ? `${viewY}-${pad(viewM + 1)}` : last.slice(0, 7);
+    const out = []; let sum = 0;
+    for (let d = new Date(y0, m0 - 1, 1); ; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+      const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+      sum += logs.filter((l) => l.date.startsWith(prefix)).reduce((s, l) => s + countOf(l) * (l.times || 1), 0);
+      out.push({ label: `${d.getMonth() + 1}月`, year: d.getFullYear(), month: d.getMonth() + 1, full: `${d.getFullYear()}年${d.getMonth() + 1}月`, v: sum, key: prefix });
+      if (prefix >= lastKey || out.length > 600) break;
+    }
+    return out;
+  }
   if (chartMode === 'day') {
     const days = new Date(viewY, viewM + 1, 0).getDate();
     const prefix = `${viewY}-${pad(viewM + 1)}-`;
@@ -185,6 +209,7 @@ function chartData() {
 }
 
 function renderChart() {
+  if (chartMode === 'all') return renderCumChart();
   const data = chartData();
   const W = 340, H = 170, L = 34, R = 6, T = 14, B = 22;
   const max = niceMax(Math.max(...data.map((d) => d.v)));
@@ -220,13 +245,54 @@ function renderChart() {
   $('#chartTable').innerHTML = `<table><tr><th>${chartMode === 'day' ? '日' : '月'}</th><th>語数</th></tr>${data.filter((d) => chartMode === 'month' || d.v).map((d) => `<tr><td>${d.full}</td><td>${fmt(d.v)}</td></tr>`).join('')}</table>`;
 }
 
+// すべて（累計）：語数の合計の折れ線と、節目（1万語・10万語…）の印。節目には達成した時の年齢（生まれた年月が設定されていれば）
+function renderCumChart() {
+  const data = chartData();
+  const W = 340, H = 190, L = 38, R = 10, T = 16, B = 22;
+  const el = $('#enChart');
+  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  el._data = data; $('#chartTip').hidden = true;
+  if (!data.length) { el.innerHTML = ''; $('#chartSum').textContent = 'まだ英語の記録がありません'; $('#chartTable').innerHTML = ''; return; }
+  const max = niceMax(data[data.length - 1].v), n = data.length;
+  const x = (i) => L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1));
+  const y = (v) => T + (H - T - B) * (1 - v / max);
+  let svg = [0, max / 2, max].map((t) => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 4}" y="${y(t) + 3}" text-anchor="end">${axisNum(t)}</text>`).join('');
+  // 横軸：長い期間は年、短い期間は数か月おき
+  data.forEach((d, i) => {
+    const show = n > 24 ? d.month === 1 : i % Math.max(1, Math.ceil(n / 6)) === 0;
+    if (show) svg += `<text class="axis" x="${x(i)}" y="${H - 6}" text-anchor="middle">${n > 24 ? d.year : (i === 0 || d.month === 1 ? `${String(d.year).slice(2)}年` : '') + d.label}</text>`;
+  });
+  const pts = data.map((d, i) => `${x(i).toFixed(1)},${y(d.v).toFixed(1)}`);
+  svg += `<path class="cum-area" d="M${x(0)},${H - B} L${pts.join(' L')} L${x(n - 1)},${H - B} Z"/><path class="cum-line" d="M${pts.join(' L')}"/>`;
+  // 節目の印（語数の節目だけ。ラベルは大きい節目から最大4つ）
+  const cid = activeChild();
+  const ms = achievedMilestones(cid).filter((m) => m.kind === 'en');
+  const idx = (date) => data.findIndex((d) => d.key === date.slice(0, 7));
+  const labeled = new Set(ms.slice().sort((a, b) => b.value - a.value).slice(0, 4).map((m) => m.key));
+  for (const m of ms) {
+    const i = idx(m.date); if (i < 0) continue;
+    const cx = x(i), cy = y(m.value);
+    svg += `<circle class="ms-dot" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3.5"/>`;
+    if (labeled.has(m.key)) {
+      const age = ageAt(cid, m.date) || `${String(m.date.slice(2, 4))}/${+m.date.slice(5, 7)}`;
+      const anchor = cx > W - 60 ? 'end' : cx < L + 30 ? 'start' : 'middle';
+      svg += `<text class="ms-label" x="${cx.toFixed(1)}" y="${(cy - 7).toFixed(1)}" text-anchor="${anchor}">${axisNum(m.value)}語・${esc(age)}</text>`;
+    }
+  }
+  data.forEach((d, i) => { svg += `<rect class="hit" data-i="${i}" x="${x(i) - (W - L - R) / n / 2}" y="${T}" width="${(W - L - R) / n}" height="${H - T - B}"/>`; });
+  el.setAttribute('aria-label', `英語の語数の累計。${fmt(data[n - 1].v)}語`);
+  el.innerHTML = svg;
+  $('#chartSum').innerHTML = `これまでの合計 <b>${fmt(data[n - 1].v)}語</b>`;
+  $('#chartTable').innerHTML = `<table><tr><th>節目</th><th>達成した日</th><th>年齢</th></tr>${ms.map((m) => `<tr><td>${axisNum(m.value)}語</td><td>${m.date.replace(/-/g, '/')}</td><td>${ageAt(cid, m.date) || '—'}</td></tr>`).join('') || '<tr><td colspan="3">まだ節目はありません</td></tr>'}</table>`;
+}
+
 function showChartTip(e) {
   const hit = e.target.closest('.hit');
   const tip = $('#chartTip');
   if (!hit) { tip.hidden = true; return; }
   const d = $('#enChart')._data[+hit.dataset.i];
   const box = $('#enChart').getBoundingClientRect(), r = hit.getBoundingClientRect();
-  tip.textContent = `${d.full}：${fmt(d.v)}語`;
+  tip.textContent = chartMode === 'all' ? `${d.full}までの累計：${fmt(d.v)}語` : `${d.full}：${fmt(d.v)}語`;
   tip.style.left = `${Math.min(box.width - 60, Math.max(60, r.left - box.left + r.width / 2))}px`;
   tip.style.top = `${r.top - box.top + 12}px`;
   tip.hidden = false;
@@ -911,7 +977,8 @@ async function openShare(ms = null) {
   $('#msHead').hidden = !ms;
   if (ms) {
     const [y, m, d] = ms.date.split('-').map(Number);
-    $('#msHead').innerHTML = `🎉 ${esc(ms.label)} 達成！<small>${y}年${m}月${d}日に達成しました</small>`;
+    const age = ageAt(activeChild(), ms.date);
+    $('#msHead').innerHTML = `🎉 ${esc(ms.label)} 達成！<small>${y}年${m}月${d}日${age ? `（${age}）` : ''}に達成しました</small>`;
   }
   if (!$('#shareDlg').open) $('#shareDlg').showModal();
   await drawShare();
@@ -942,7 +1009,8 @@ async function drawShare() {
   const d = shareData();
   let text;
   if (shareMs) {
-    await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: d.name });
+    const age = ageAt(activeChild(), shareMs.date);
+    await renderMilestoneImage($('#shareCanvas'), { ...shareMs, name: d.name, sub: age ? `${age}で達成！` : '' });
     text = `${d.name ? d.name + 'が' : ''}${shareMs.label}を達成しました！🎉\n#${CONFIG.hashtags.join(' #')}`;
   } else {
     if (shareKind === 'shelf') await renderShelfImage($('#shareCanvas'), d);
@@ -1007,6 +1075,7 @@ function renderSettings() {
       <input class="emoji" value="${esc(c.emoji)}" maxlength="4" aria-label="アイコン">
       <input class="name" value="${esc(c.name)}" maxlength="20" aria-label="名前（ニックネーム）">
       <label class="adult" title="大人の英語学習者"><input type="checkbox" class="is-adult" ${c.adult ? 'checked' : ''}>大人</label>
+      <label class="birth-l" title="生まれた年月（任意。節目の年齢の表示に使います）">生まれた年月<input type="month" class="birth" value="${esc(c.birth || '')}"></label>
       ${children().length > 1 ? '<button class="icon-btn del" aria-label="削除">🗑️</button>' : ''}
     </div>`).join('');
   const g = $('#gArea');
@@ -1216,6 +1285,7 @@ function bind() {
     c.name = row.querySelector('.name').value.trim() || c.name;
     c.emoji = row.querySelector('.emoji').value.trim() || c.emoji;
     c.adult = row.querySelector('.is-adult').checked;
+    c.birth = row.querySelector('.birth').value || '';
     c.updatedAt = Date.now(); commit();
   });
   $('#childList').addEventListener('click', (e) => {
