@@ -234,19 +234,25 @@ export async function renderGrowthImage(canvas, g) {
     ctx.fillStyle = C.sub; ctx.font = `700 26px ${FONT}`;
     ctx.textAlign = 'left'; ctx.fillText(`${sy}年${sm}月`, cx0, cy1 + 38);
     ctx.textAlign = 'right'; ctx.fillText(`${ey}年${em}月`, cx1, cy1 + 38);
-    // 節目の印（ラベルは重ならないものだけ）
-    const placed = [];
-    for (const m of g.ms.filter((x) => x.lang === p.lang).sort((a, b) => b.value - a.value)) {
-      const i = g.months.findIndex((mm) => mm.key === m.date.slice(0, 7)); if (i < 0) continue;
+    // 節目の印と、節目（10万語）・通過した年月（2022年7月）。近い印どうしは文字を線の上と下に分けて、全部に年月を出す
+    const above = [], below = [];
+    const list = g.ms.filter((x) => x.lang === p.lang).map((m) => ({ m, i: g.months.findIndex((mm) => mm.key === m.date.slice(0, 7)) }))
+      .filter((o) => o.i >= 0).sort((a, b) => a.i - b.i);
+    for (const { m, i } of list) {
       const x = X(i), y = Y(Math.min(m.value, max));
       ctx.fillStyle = '#fff'; ctx.strokeStyle = C.accent; ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(x, y, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      if (placed.every((px) => Math.abs(px - x) > 190)) {
-        placed.push(x);
-        ctx.textAlign = x > cx1 - 120 ? 'right' : x < cx0 + 120 ? 'left' : 'center';
-        ctx.font = `800 28px ${FONT}`; ctx.lineWidth = 8; ctx.strokeStyle = '#fff'; ctx.fillStyle = '#2f7a55';
-        ctx.strokeText(m.short, x, y - 24); ctx.fillText(m.short, x, y - 24);
-      }
+      const free = (arr) => arr.every((px) => Math.abs(px - x) > 150);
+      const pos = free(above) ? 'above' : free(below) ? 'below' : 'above';
+      (pos === 'above' ? above : below).push(x);
+      const [my, mm] = m.date.split('-').map(Number);
+      const y1 = pos === 'above' ? y - 52 : y + 46, y2 = pos === 'above' ? y - 24 : y + 72;
+      ctx.textAlign = x > cx1 - 120 ? 'right' : x < cx0 + 120 ? 'left' : 'center';
+      ctx.lineWidth = 8; ctx.strokeStyle = '#fff';
+      ctx.font = `800 28px ${FONT}`; ctx.fillStyle = '#2f7a55';
+      ctx.strokeText(m.short, x, y1); ctx.fillText(m.short, x, y1);
+      ctx.font = `700 22px ${FONT}`; ctx.fillStyle = C.sub;
+      ctx.strokeText(`${my}年${mm}月`, x, y2); ctx.fillText(`${my}年${mm}月`, x, y2);
     }
   });
   ctx.textAlign = 'center';
