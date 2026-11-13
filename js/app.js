@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib, workOf } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShelfImage, renderMilestoneImage, renderGrowthImage, renderAgeImage, canvasToFile } from './share.js';
 
@@ -806,6 +806,16 @@ function onSearch() {
     presets.push(...searchPub(q, 10).filter((b) => !have.has(b.isbn)));
   }
   if (langOk('en')) presets.push(...searchEnLib(q, 15)); // 洋書の語数リスト（本のリストと重ならない本だけが入っている）
+  // 同じ作品の別の版（ハードカバーとペーパーバックなど）は1行にまとめる（語数のある版を残す）
+  const byWork = new Map();
+  for (let i = 0; i < presets.length; i++) {
+    const w = workOf(presets[i].isbn); if (!w) continue;
+    const j = byWork.get(w);
+    if (j == null) { byWork.set(w, i); continue; }
+    if (!presets[j].count && presets[i].count) { presets[j] = presets[i]; }
+    presets[i] = null;
+  }
+  for (let i = presets.length - 1; i >= 0; i--) if (!presets[i]) presets.splice(i, 1);
   const base = presets.length ? '<div class="res-label">📚 登録済みの本</div>' + presets.map(itemHtml).join('') : '';
   setResults(base + '<div class="res-label">🔎 ほかの本を検索中…</div>', [...presets]);
   searchTimer = setTimeout(async () => {
@@ -815,7 +825,8 @@ function onSearch() {
       // ネット検索の結果も、同じ本かどうかは ISBN だけで判断。ISBN のない結果は出さない
       await Promise.all([loadPubAges(), loadEnLib()]);
       const seen = new Set(presets.map((p) => p.isbn).filter(Boolean));
-      const extra = web.filter((b) => /^97[89]\d{10}$/.test(b.isbn || '') && !seen.has(b.isbn) && !PRESET_BOOKS.some((x) => x.isbn === b.isbn))
+      const seenWork = new Set(presets.map((p) => workOf(p.isbn)).filter(Boolean));
+      const extra = web.filter((b) => /^97[89]\d{10}$/.test(b.isbn || '') && !seen.has(b.isbn) && !(workOf(b.isbn) && seenWork.has(workOf(b.isbn))) && !PRESET_BOOKS.some((x) => x.isbn === b.isbn))
         .filter((b, i, all) => all.findIndex((x) => x.isbn === b.isbn) === i).map((b) => {
         const lib = enLibBook(b.isbn); // 洋書の語数リストにある本なら語数・年齢つきで
         if (lib) return { ...b, ...lib, title: lib.title || b.title, cover: b.cover };
