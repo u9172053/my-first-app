@@ -755,8 +755,14 @@ function renderSearchEmpty() {
     seen.add(l.title); recent.push(l);
     if (recent.length >= 8) break;
   }
-  const popular = ['はらぺこあおむし', 'ぐりとぐら', 'だるまさんが', 'Oxford Reading Tree Stage 1+（1冊）', 'Brown Bear, Brown Bear, What Do You See?', 'The Very Hungry Caterpillar', 'Elephant & Piggie（1冊・平均）', 'Frog and Toad Are Friends', 'Magic Tree House #1 Dinosaurs Before Dark']
-    .map((t) => PRESET_BOOKS.find((b) => b.title === t)).filter((b) => b && langOk(b.lang));
+  // 人気の本：日本語と英語を交互に（ISBN で探す。英語の多くは洋書リストにあるので、読み込み後に表示し直す）
+  const JA = ['9784033280103', '9784834000825', '9784893094315', '9784834000627', '9784834002188', '9784834008302'];
+  const EN = ['9780140569322', '9780064440202', '9781529512335', '9780394800165', '9780307285041', '9780007254699'];
+  const pick = (isbn) => PRESET_BOOKS.find((b) => b.isbn === isbn) || enLibBook(isbn);
+  const ja = JA.map(pick).filter((b) => b && langOk('ja')), en = EN.map(pick).filter((b) => b && langOk('en'));
+  const n = ja.length && en.length ? 3 : 6, popular = [];
+  for (let i = 0; i < n; i++) { if (ja[i]) popular.push(ja[i]); if (en[i]) popular.push(en[i]); }
+  if (!enLibReady() && langOk('en')) loadEnLib().then(() => { if ($('#addDlg').open && !$('#searchInput').value.trim()) renderSearchEmpty(); });
   let html = '';
   if (recent.length) {
     html += '<div class="res-label">🔁 最近読んだ本（もう一度読んだ時に）</div>' +
