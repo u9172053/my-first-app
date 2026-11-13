@@ -14,7 +14,7 @@ function emptyState() {
   const now = Date.now();
   return {
     version: 1,
-    children: [{ id: 'c' + uid(), name: 'わが子', emoji: '🐻', updatedAt: now }],
+    children: [{ id: 'c' + uid(), name: 'わが子', emoji: '👶', updatedAt: now }],
     logs: [],
     settings: { activeChild: 'all', shareShowName: false },
     updatedAt: now,
@@ -31,6 +31,8 @@ export function loadState() {
     const s = JSON.parse(raw);
     if (!s.children || !s.logs) return emptyState();
     s.settings = { activeChild: 'all', shareShowName: false, ...(s.settings || {}) };
+    // 最初から入っている「わが子」のマークを、くま🐻から赤ちゃん👶に（名前もマークも変えていない人だけ）
+    for (const c of s.children) if (c.name === 'わが子' && c.emoji === '🐻') c.emoji = '👶';
     return s;
   } catch { return emptyState(); }
 }
