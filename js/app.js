@@ -812,7 +812,8 @@ function onSearch() {
     const w = workOf(presets[i].isbn); if (!w) continue;
     const j = byWork.get(w);
     if (j == null) { byWork.set(w, i); continue; }
-    if (!presets[j].count && presets[i].count) { presets[j] = presets[i]; }
+    // 先に出ている行（本のリストの行は著者・表紙を持っている）を残し、語数・年齢だけ版から移す
+    if (!presets[j].count && presets[i].count) presets[j] = { ...presets[j], count: presets[i].count, exact: true, tgt: presets[j].tgt || presets[i].tgt, tgtAge: presets[j].tgtAge ?? presets[i].tgtAge };
     presets[i] = null;
   }
   for (let i = presets.length - 1; i >= 0; i--) if (!presets[i]) presets.splice(i, 1);
