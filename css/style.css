@@ -310,3 +310,9 @@ body[data-only=ja] .both-only, body[data-only=en] .both-only { display: none !im
 .birth-l input { width: auto; padding: 4px 8px; font-size: 13px; }
 .child-row { flex-wrap: wrap; }
 .chart-tabs span { font-size: 13px; padding: 9px 4px; }
+
+/* ホーム画面に追加の案内 */
+.a2hs { position: relative; background: #eaf6ef; border: 1px solid #cfe9da; padding: 12px 40px 12px 14px; }
+.a2hs-t { margin: 0 0 4px; font-weight: 800; color: #2f7a55; font-size: 14px; }
+.a2hs-s { margin: 0; font-size: 13px; color: var(--ink); line-height: 1.6; }
+.a2hs-x { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; font-size: 16px; }

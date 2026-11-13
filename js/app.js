@@ -1401,6 +1401,22 @@ function bind() {
 
 
 // ---------------- iframe 埋め込み時の高さ通知 ----------------
+// ホーム画面に追加の案内：ブログのページにはめ込まれているスマホのときだけ、一度閉じたら出さない
+// （追加されるのはブログのページ。開くたびにブログに来てもらえる）
+function showA2hs() {
+  const embedded = window.parent !== window;
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  let closed = false;
+  try { closed = localStorage.getItem('tadoku-a2hs-closed') === '1'; } catch { /* 保存できない環境では毎回出さない */ closed = true; }
+  if (!embedded || !mobile || closed) return;
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  $('#a2hsSteps').innerHTML = ios
+    ? 'Safari の画面下の <b>共有ボタン</b>（□に↑）→ <b>「ホーム画面に追加」</b>'
+    : 'Chrome の右上の <b>︙メニュー</b> → <b>「ホーム画面に追加」</b>';
+  $('#a2hs').hidden = false;
+  $('#a2hsClose').onclick = () => { $('#a2hs').hidden = true; try { localStorage.setItem('tadoku-a2hs-closed', '1'); } catch { /* noop */ } };
+}
+
 function autoHeight() {
   if (window.parent === window) return;
   const post = () => window.parent.postMessage({ type: 'tadoku-height', height: document.documentElement.scrollHeight }, '*');
@@ -1457,6 +1473,7 @@ async function backfillTargets() {
 
 bind();
 render();
+showA2hs();
 checkMilestones(true); // 別の端末の記録が同期されて節目を超えていたら、ここでお祝い（初めての人は「済み」にするだけ）
 setTimeout(backfillTargets, 1500);
 updateSyncUi(sync.linked ? 'stale' : 'off');

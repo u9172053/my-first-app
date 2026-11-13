@@ -11,6 +11,8 @@
 <meta property="og:image" content="og.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#fff8ee">
+<!-- 公開前は検索エンジンに載せない（ブログのページから使ってもらう） -->
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon-64.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,6 +37,13 @@
   </header>
 
   <nav id="childTabs" class="child-tabs" aria-label="記録する子"></nav>
+
+  <!-- ホーム画面に追加の案内（ブログのページにはめ込まれていて、スマホのときだけ） -->
+  <section class="card a2hs" id="a2hs" hidden>
+    <button class="icon-btn a2hs-x" id="a2hsClose" aria-label="閉じる">✕</button>
+    <p class="a2hs-t">📲 ホーム画面に追加すると、次からすぐ開けます</p>
+    <p class="a2hs-s" id="a2hsSteps"></p>
+  </section>
 
   <section class="stats" id="stats"></section>
 
