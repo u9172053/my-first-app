@@ -3,7 +3,7 @@
 // ============================================================
 export const CONFIG = {
   appName: '多読きろく帳',
-  siteName: 'おうち英語の解体新書',
+  siteName: 'おうち英語クラブ',
   siteUrl: 'https://www.ouchieigo-club.com/kaitai-shinsho/',
 
   // このアプリを埋め込んだ WordPress ページのURL（SNSシェアのリンク先）
@@ -26,5 +26,5 @@ export const CONFIG = {
   // メルカリアンバサダーのID（共有リンクの afid=○○ の数字）
   mercariAfid: '9184954178',
 
-  hashtags: ['おうち英語', '多読', 'おうち英語の解体新書'],
+  hashtags: ['おうち英語', '多読', 'おうち英語クラブ'],
 };
