@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib, workOf } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib, workOf, enLibReady, pubReady } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShelfImage, renderMilestoneImage, renderGrowthImage, renderAgeImage, canvasToFile } from './share.js';
 
@@ -799,6 +799,11 @@ function onSearch() {
   searchCtl?.abort();
   if (!q) { itemIdx = 0; renderSearchEmpty(); return; }
   itemIdx = 0;
+  // 洋書の語数リスト・出版社の目録をまだ読み込み中なら、読み終わったら同じ言葉で検索し直す
+  if ((!enLibReady() || !pubReady()) && onSearch.retried !== q) {
+    onSearch.retried = q; // 読み込みに失敗したときに繰り返さないよう、やり直しは同じ言葉で1回だけ
+    Promise.all([loadEnLib(), loadPubAges()]).then(() => { if ($('#searchInput').value.trim() === q) onSearch(); });
+  }
   const presets = searchPresets(q, 30).filter((b) => langOk(b.lang)).slice(0, 15);
   // 出版社の目録（対象年齢つき）からも探す。リストにある本と同じものは除く
   if (langOk('ja')) {
