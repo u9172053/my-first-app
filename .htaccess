@@ -1,0 +1,4 @@
+# アプリのファイルを検索エンジンや AI の学習に使わせない（ブログのページの中から使う）
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow, noai, noimageai"
+</IfModule>
