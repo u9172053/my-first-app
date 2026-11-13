@@ -323,3 +323,12 @@ body[data-only=ja] .both-only, body[data-only=en] .both-only { display: none !im
   .chip-btn { font-size: 11px; padding: 5px 8px; }
   .seg span { font-size: 13px; }
 }
+
+/* 記録画面：バーコードで登録を大きく目立たせる */
+.scan-big { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0 12px; padding: 14px 16px; border: 0; border-radius: 16px; background: var(--accent); color: #fff; text-align: left; cursor: pointer; box-shadow: var(--shadow); font: inherit; }
+.scan-big .scan-ic { font-size: 30px; line-height: 1; }
+.scan-big b { display: block; font-size: 17px; font-weight: 800; }
+.scan-big small { display: block; font-size: 12px; opacity: .92; margin-top: 2px; }
+.scan-big:active { transform: scale(.98); }
+.or-line { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: var(--sub); font-size: 12px; }
+.or-line::before, .or-line::after { content: ''; flex: 1; border-top: 1px solid var(--line); }

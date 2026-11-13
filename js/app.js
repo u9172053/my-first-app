@@ -752,7 +752,8 @@ function openAdd(date = null, log = null) {
     renderSearchEmpty();
   }
   if (!$('#addDlg').open) $('#addDlg').showModal();
-  if (!log) setTimeout(() => $('#searchInput').focus({ preventScroll: true }), 50);
+  // スマホでは最初にキーボードを出さない（バーコードのボタンが隠れないように）。パソコンは検索欄に入力できる状態に
+  if (!log && !matchMedia('(pointer: coarse)').matches) setTimeout(() => $('#searchInput').focus({ preventScroll: true }), 50);
 }
 
 function showSearch() {
