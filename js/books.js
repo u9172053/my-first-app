@@ -185,8 +185,19 @@ const isGeneric = (title) => /（1冊|\(1冊/.test(title);
 // 戻り値: URL文字列 / ''（表紙なし確定） / undefined（未取得）
 const olCoverUrl = (id) => `https://covers.openlibrary.org/b/id/${id}-M.jpg`;
 
+// ISBN がある本の表紙候補：まずその ISBN の表紙（openBD・国会図書館・Open Library）を使い、
+// 書名検索で見つけてあった表紙（coverUrl・olCover。似た書名の別の本のことがある）は、ISBN で見つからなかったときだけ
+function isbnFirst(b) {
+  if (!/^97[89]\d{10}$/.test(b?.isbn || '')) return '';
+  const own = [`https://cover.openbd.jp/${b.isbn}.jpg`, `https://ndlsearch.ndl.go.jp/thumbnail/${b.isbn}.jpg`, `https://covers.openlibrary.org/b/isbn/${b.isbn}-M.jpg?default=false`];
+  if (b.lang === 'en') own.unshift(own.pop()); // 洋書は Open Library を先に
+  const rep = b.coverIsbn && b.coverIsbn !== b.isbn ? isbnCoverList(b.coverIsbn).split('|').slice(0, 2) : [];
+  return [...new Set([...own, ...rep, b.coverUrl, b.olCover && olCoverUrl(b.olCover), `search:${b.pid}`].filter(Boolean))].join('|');
+}
+
 export function cachedCover(pid) {
   const b = PRESET_BOOKS.find((x) => x.pid === pid);
+  if (isbnFirst(b)) return isbnFirst(b);
   if (b?.coverUrl) return b.coverUrl + (b.isbn ? `|search:${b.pid}` : '');
   if (b?.olCover) return olCoverUrl(b.olCover) + (b.isbn ? `|search:${b.pid}` : '');
   if (b?.coverIsbn) return isbnCoverList(b.coverIsbn, b.pid);
@@ -248,6 +259,7 @@ export function isbnCoverList(isbn, pid) {
   return [
     `https://cover.openbd.jp/${isbn}.jpg`,
     `https://ndlsearch.ndl.go.jp/thumbnail/${isbn}.jpg`,
+    `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg?default=false`,
     pid ? `search:${pid}` : `https://books.google.com/books/content?vid=ISBN${isbn}&printsec=frontcover&img=1&zoom=1`,
   ].join('|');
 }
@@ -262,8 +274,8 @@ export function searchCoverStrict(pid) {
   const author = (book.author || '').split(/[\/,・]/)[0].trim();
   const real = (b) => b.cover && !b.cover.includes('ndlsearch');
   const p = (async () => {
-    if (book.coverIsbn) {
-      const hit = (await searchGoogleBooks(`isbn:${book.coverIsbn}`)).find(real);
+    for (const i of [book.coverIsbn, book.isbn].filter(Boolean)) {
+      const hit = (await searchGoogleBooks(`isbn:${i}`)).find(real);
       if (hit) return hit.cover;
     }
     let list = await searchGoogleBooks(`intitle:${title}` + (author ? ` inauthor:${author}` : ''));
@@ -275,6 +287,7 @@ export function searchCoverStrict(pid) {
 }
 
 export function fetchPresetCover(book) {
+  if (isbnFirst(book)) return Promise.resolve(isbnFirst(book));
   if (book.coverUrl) return Promise.resolve(book.coverUrl + (book.isbn ? `|search:${book.pid}` : ''));
   if (book.olCover) return Promise.resolve(olCoverUrl(book.olCover) + (book.isbn ? `|search:${book.pid}` : ''));
   if (book.coverIsbn) return Promise.resolve(isbnCoverList(book.coverIsbn, book.pid));
