@@ -755,20 +755,25 @@ function renderSearchEmpty() {
     seen.add(l.title); recent.push(l);
     if (recent.length >= 8) break;
   }
-  // 人気の本：日本語と英語を交互に（ISBN で探す。英語の多くは洋書リストにあるので、読み込み後に表示し直す）
+  // 人気の本：言語ごとに見出しで分ける（ISBN で探す。英語の多くは洋書リストにあるので、読み込み後に表示し直す）
+  // 上に出す言語は、今の子の直近10冊で多い方（同じ・記録なしなら日本語）
   const JA = ['9784033280103', '9784834000825', '9784893094315', '9784834000627', '9784834002188', '9784834008302'];
   const EN = ['9780140569322', '9780064440202', '9781529512335', '9780394800165', '9780307285041', '9780007254699'];
   const pick = (isbn) => PRESET_BOOKS.find((b) => b.isbn === isbn) || enLibBook(isbn);
   const ja = JA.map(pick).filter((b) => b && langOk('ja')), en = EN.map(pick).filter((b) => b && langOk('en'));
-  const n = ja.length && en.length ? 3 : 6, popular = [];
-  for (let i = 0; i < n; i++) { if (ja[i]) popular.push(ja[i]); if (en[i]) popular.push(en[i]); }
+  const n = ja.length && en.length ? 3 : 6;
+  const last10 = logsFor().slice().sort((x, y) => (y.date || '').localeCompare(x.date || '') || (y.updatedAt || 0) - (x.updatedAt || 0)).slice(0, 10);
+  const enFirst = last10.filter((l) => l.lang === 'en').length > last10.filter((l) => l.lang === 'ja').length;
+  const groups = [['日本語', ja.slice(0, n)], ['英語', en.slice(0, n)]].filter(([, list]) => list.length);
+  if (enFirst) groups.reverse();
+  const popular = groups.flatMap(([, list]) => list);
   if (!enLibReady() && langOk('en')) loadEnLib().then(() => { if ($('#addDlg').open && !$('#searchInput').value.trim()) renderSearchEmpty(); });
   let html = '';
   if (recent.length) {
     html += '<div class="res-label">🔁 最近読んだ本（もう一度読んだ時に）</div>' +
       recent.map((l) => itemHtml({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid, exact: true }, 'r')).join('');
   }
-  html += '<div class="res-label">⭐ 人気の本</div>' + popular.map((b) => itemHtml(b, 'p')).join('');
+  for (const [name, list] of groups) html += `<div class="res-label">⭐ 人気の${name}の本</div>` + list.map((b) => itemHtml(b, 'p')).join('');
   setResults(html, [...recent.map((l) => ({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid, exact: true })), ...popular]);
 }
 
