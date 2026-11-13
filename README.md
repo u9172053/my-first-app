@@ -33,24 +33,22 @@ shareUrl: '...',         // SNS で共有されるリンク（WordPress のペ�
 
 ## 公開手順
 
-### 1. GitHub Pages で公開する
-1. 無料プランでは **非公開リポジトリから GitHub Pages を公開できません**。リポジトリを Public にしてください。コードに秘密の情報は入っていません（クライアントIDは公開しても問題ない値です）。
-2. GitHub のリポジトリで Settings → Pages → Branch: `main` / `(root)` を選んで Save します。
-3. 数分後に `https://u9172053.github.io/my-first-app/` で公開されます。
+### 1. ブログのサーバー（ConoHa WING）に置く
+1. コントロールパネル →「サイト管理」→「ファイルマネージャー」を開きます。
+2. `public_html/ouchieigo-club.com/` の中に `tadoku-app` フォルダを作ります。
+3. アプリ一式（index.html・css・js・data・assets・og.png）をそのフォルダにアップロードします。
+4. `https://www.ouchieigo-club.com/tadoku-app/` を開いて表示されれば完了です。
+   更新するときは、変わったファイルを同じ場所に上書きします。記録は利用者のブラウザに残るので、アドレスを変えなければ消えません。
 
-### 2. Google ログインの設定（English Quest のクライアントIDを流用できます）
-1. [Google Cloud Console](https://console.cloud.google.com/) で English Quest のプロジェクトを開きます。
-2. 「API とサービス」→「ライブラリ」で **Google Drive API** を有効にします。
-3. 「認証情報」→ English Quest の OAuth クライアントID（ウェブアプリケーション）を開き、「承認済みの JavaScript 生成元」に次を追加します：
-   - `https://u9172053.github.io`
-4. 「OAuth 同意画面」→「データアクセス（スコープ）」に `.../auth/drive.appdata` を追加します。
-5. 同意画面の公開ステータスが「テスト」のままだと、テストユーザーとして登録した人しかログインできません。「本番環境に公開」にしてください（drive.appdata は審査の軽い「非機密」スコープです）。
-6. クライアントID（`xxxx.apps.googleusercontent.com`）を `js/config.js` の `googleClientId` に貼り付けます。
+### 2. Google の設定
+1. [Google Cloud Console](https://console.cloud.google.com/) の「認証情報」で、OAuth クライアントIDの「承認済みの JavaScript 生成元」に `https://www.ouchieigo-club.com` を追加します。
+2. Books API キーの「ウェブサイトの制限」に `https://www.ouchieigo-club.com/*` を追加します。
+3. 「OAuth 同意画面」の公開ステータスを「本番環境に公開」にします（テストのままだと、テストユーザーしかログインできません）。
 
-### 3. WordPress に埋め込む
-1. 固定ページを新規作成します（例：「多読きろく帳」）。
-2. 「カスタムHTML」ブロックに `wordpress/embed.html` の中身を貼り付けます。
-3. SNS でシェアされた時の見た目を整えるには、SEO プラグインでそのページの OGP 画像に `og.png` を設定してください。
+### 3. WordPress のページに表示する
+1. 固定ページ（例：`/tadoku/`）に「カスタムHTML」ブロックを追加し、`wordpress/embed.html` の中身を貼り付けます。
+2. 公開前に限定したい場合は、公開状態を「パスワード保護」にします。
+3. SNS でシェアされた時の見た目は、SEO プラグインでそのページの OGP 画像に `og.png` を設定します。
 
 ## ファイル構成
 

@@ -7,7 +7,7 @@ export const CONFIG = {
   siteUrl: 'https://www.ouchieigo-club.com/kaitai-shinsho/',
 
   // このアプリを埋め込んだ WordPress ページのURL（SNSシェアのリンク先）
-  shareUrl: 'https://www.ouchieigo-club.com/kaitai-shinsho/',
+  shareUrl: 'https://www.ouchieigo-club.com/tadoku/',
 
   // Google Cloud で発行した OAuth クライアントID（English Quest で使ったものを流用可）
   // 例: '1234567890-xxxxxxxx.apps.googleusercontent.com'
