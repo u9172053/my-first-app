@@ -57,7 +57,7 @@ export function searchPub(q, n = 10) {
 }
 
 // ---------------- 洋書の語数リスト（日本多読学会の語数リストのうち、本のリストにない本） ----------------
-// data/en-lib.json：[ISBN, 書名, シリーズ, 語数, YL下, YL上, 対象年齢, 表記]。必要になったときだけ読み込む
+// data/en-lib.json：[ISBN, 書名, シリーズ, 語数, YL下, YL上, 対象年齢, 表記, 著者]。必要になったときだけ読み込む
 let enRows = null, enByIsbn = new Map(), enLoading = null;
 // 同じ作品の別の版（Open Library の作品で判定）：{ISBN: 作品の番号}。検索結果で同じ作品を1行にまとめるのに使う
 let worksMap = {};
@@ -66,17 +66,17 @@ export function loadEnLib() {
   if (enRows) return Promise.resolve(enRows);
   fetch(new URL('../data/en-works.json', import.meta.url)).then((r) => r.json()).then((w) => { worksMap = w; }).catch(() => {});
   return (enLoading ||= fetch(new URL('../data/en-lib.json', import.meta.url)).then((r) => r.json()).then((rows) => {
-    enRows = rows.map(([isbn, title, series, count, y0, y1, age, label]) => ({ isbn, title, series, count, yl: [y0, y1], age, label, key: norm(title) }));
+    enRows = rows.map(([isbn, title, series, count, y0, y1, age, label, author]) => ({ isbn, title, series, count, yl: [y0, y1], age, label, author: author || '', key: norm(title) }));
     enByIsbn = new Map(enRows.map((r) => [r.isbn, r]));
     return enRows;
   }).catch(() => { enLoading = null; return []; }));
 }
-const enBook = (r) => ({ title: r.title, author: '', series: r.series, isbn: r.isbn, lang: 'en', count: r.count, exact: true, tgt: r.label || '', tgtAge: r.age, lbl: r.series, cover: '' });
+const enBook = (r) => ({ title: r.title, author: r.author, series: r.series, isbn: r.isbn, lang: 'en', count: r.count, exact: true, tgt: r.label || '', tgtAge: r.age, lbl: r.series, cover: '' });
 export const enLibBook = (isbn) => { const r = enByIsbn.get(isbn); return r ? enBook(r) : null; };
 export function searchEnLib(q, n = 15) {
   if (!enRows) return [];
   const k = norm(q); if (k.length < 2) return [];
-  const hits = enRows.filter((r) => r.key.includes(k) || norm(r.series).includes(k));
+  const hits = enRows.filter((r) => r.key.includes(k) || norm(r.series).includes(k) || norm(r.author).includes(k));
   hits.sort((a, b) => (a.key.startsWith(k) ? 0 : 1) - (b.key.startsWith(k) ? 0 : 1) || a.key.length - b.key.length);
   return hits.slice(0, n).map(enBook);
 }
