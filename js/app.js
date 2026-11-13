@@ -1167,7 +1167,7 @@ function renderSettings() {
       <button class="btn primary wide" id="gIn">Googleでログイン</button>`;
   }
   // モデルケースは1人だけ。追加済みなら、消すときは上の🗑から
-  $('#modelBtn').textContent = '⭐ モデルケース（5歳〜10歳の5年分の見本）を追加';
+  $('#modelBtn').textContent = '⭐ モデルケース（5〜10歳）を追加';
   $('#modelBtn').hidden = children().some((c) => c.model);
 }
 
