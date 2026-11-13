@@ -74,6 +74,8 @@ export function loadEnLib() {
 const enBook = (r) => ({ title: r.title, author: r.author, series: r.series, isbn: r.isbn, lang: 'en', count: r.count, exact: true, tgt: r.label || '', tgtAge: r.age, lbl: r.series, cover: '' });
 export const enLibReady = () => !!enRows;
 export const pubReady = () => !!pubRows;
+// 洋書リストの同じシリーズの本（リストの並び＝おおむね巻の順）
+export const enLibSeries = (series) => (enRows && series ? enRows.filter((r) => r.series === series).map(enBook) : []);
 export const enLibBook = (isbn) => { const r = enByIsbn.get(isbn); return r ? enBook(r) : null; };
 export function searchEnLib(q, n = 15) {
   if (!enRows) return [];

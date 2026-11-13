@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { PRESET_BOOKS } from './books-db.js';
 import { loadState, saveLocal, uid, DriveSync } from './storage.js';
-import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, searchEnLib, workOf, enLibReady, pubReady } from './books.js';
+import { norm, titleKeys, shareTargets, seriesTarget, searchCoverStrict, searchPresets, searchGoogleBooks, lookupIsbn, findPresetByTitle, fetchPresetCover, cachedCover, amazonUrl, rakutenUrl, mercariUrl, withIsbnCovers, loadPubAges, pubAge, searchPub, loadEnLib, enLibBook, enLibSeries, searchEnLib, workOf, enLibReady, pubReady } from './books.js';
 import { IsbnScanner } from './scanner.js';
 import { renderShelfImage, renderMilestoneImage, renderGrowthImage, renderAgeImage, canvasToFile } from './share.js';
 
@@ -82,10 +82,6 @@ function streak(logs) {
 function applyLangMode() {
   const m = langMode();
   document.body.dataset.only = m === 'both' ? '' : m;
-  if (m !== 'both') {
-    recoLang = m;
-    const r = document.querySelector(`input[name=recoLang][value=${m}]`); if (r) r.checked = true;
-  }
   const s = document.querySelector(`input[name=langMode][value=${m}]`); if (s) s.checked = true;
 }
 
@@ -468,7 +464,6 @@ function renderHistory() {
 // ---------------- おすすめ ----------------
 // 英語：最近読んだ英語の本のレベル平均から「同じくらい」4冊＋「少し上」4冊
 // 日本語：最近読んだ日本語の本の文字数から「同じくらい」4冊＋「少し長め」4冊
-let recoLang = 'ja';
 
 // 同じくらいの点数の本は日替わりで入れ替える（いつも同じ本ばかりにならないように）
 function dailyJitter(pid) {
@@ -488,7 +483,36 @@ function pickBooks(cands, scoreFn, n, used) {
   return out;
 }
 
+// 直近10冊で英語が日本語より多いか（おすすめ・人気の本で、どちらの言語を上に出すか）
+function enFirst() {
+  const last10 = logsFor().slice().sort((x, y) => (y.date || '').localeCompare(x.date || '') || (y.updatedAt || 0) - (x.updatedAt || 0)).slice(0, 10);
+  return last10.filter((l) => l.lang === 'en').length > last10.filter((l) => l.lang === 'ja').length;
+}
+
+// 日本語・英語の両方を表示するときは、各言語「同じくらい」「ちょっとチャレンジ」を2冊ずつ（パソコンの広い画面では4冊ずつ）
 function renderReco() {
+  const langs = langMode() === 'both' ? (enFirst() ? ['en', 'ja'] : ['ja', 'en']) : [langMode()];
+  const n = langs.length > 1 && !matchMedia('(min-width: 640px)').matches ? 2 : 4;
+  const all = [];
+  $('#recoBody').innerHTML = langs.map((lang) => {
+    const { same, up, note, rel } = recoFor(lang, n);
+    all.push(...same, ...up);
+    const card = (b) => recoCard(b, rel(b).why);
+    return (langs.length > 1 ? `<h3 class="reco-lang">${lang === 'ja' ? '🇯🇵 日本語の本' : '🇬🇧 英語の本'}</h3>` : '')
+      + `<p class="muted">${esc(note)}</p>`
+      + `<h3 class="reco-h">🙂 同じくらいのレベル</h3><div class="reco-list">${same.map(card).join('')}</div>`
+      + `<h3 class="reco-h">💪 ちょっとチャレンジ</h3><div class="reco-list">${up.map(card).join('') || '<p class="muted small">今のところ、これより上のおすすめはありません。</p>'}</div>`;
+  }).join('');
+  all.forEach((b) => {
+    if (cachedCover(b.pid) !== undefined) return;
+    fetchPresetCover(b).then((url) => {
+      if (!url) { markCover(b.pid, 0); return; }
+      document.querySelectorAll(`.reco-img[data-pid="${b.pid}"]`).forEach((el) => { el.innerHTML = recoCover(url, b); });
+    });
+  });
+}
+
+function recoFor(recoLang, N = 4) {
   const logs = logsFor().slice().sort((a, b) => (a.date < b.date ? 1 : -1));
   const readPids = new Set(logs.map((l) => l.pid).filter(Boolean));
   const readTitles = new Set(logs.map((l) => l.title));
@@ -545,15 +569,15 @@ function renderReco() {
     if (adultMode) {
       // 大人：学習者向けの本2冊＋子ども向けの本2冊ずつ（レベル的に子どもの本を読みたい人もいるので両方出す）
       const learner = cands.filter((b) => b.gr), kids = cands.filter((b) => !b.gr);
-      same = [...pickBooks(learner, sameScore, 2, used), ...pickBooks(kids, sameScore, 2, used)];
-      up = [...pickBooks(learner, upScore, 2, used), ...pickBooks(kids, upScore, 2, used)];
+      same = [...pickBooks(learner, sameScore, N / 2, used), ...pickBooks(kids, sameScore, N / 2, used)];
+      up = [...pickBooks(learner, upScore, N / 2, used), ...pickBooks(kids, upScore, N / 2, used)];
     } else {
-      same = pickBooks(cands, sameScore, 4, used);
-      up = pickBooks(cands, upScore, 4, used);
+      same = pickBooks(cands, sameScore, N, used);
+      up = pickBooks(cands, upScore, N, used);
     }
     // 足りない時は条件をゆるめて補う
-    if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.lv - base), 4 - same.length, used));
-    if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.lv > base ? b.lv - base : null), 4 - up.length, used));
+    if (same.length < N) same.push(...pickBooks(cands, (b) => Math.abs(b.lv - base), N - same.length, used));
+    if (up.length < N) up.push(...pickBooks(cands, (b) => (b.lv > base ? b.lv - base : null), N - up.length, used));
     note = avg == null ? 'まだ英語の記録がないので、はじめての1冊におすすめの本を選びました。'
       : `最近読んでいる英語の本は「${ageText(enAge(avg), enAgeNum(avg))}」向けくらい。それをもとに選びました。`;
   } else {
@@ -561,25 +585,15 @@ function renderReco() {
     const ages = recent.map((l) => preset(l)?.age ?? charsToAge(l.count)).filter((v) => v != null);
     const avg = ages.length ? ages.reduce((s, v) => s + v, 0) / ages.length : null;
     const base = avg ?? 1;
-    same = pickBooks(cands, (b) => (Math.abs(b.age - base) <= 0.75 + slack(b) ? Math.abs(b.age - base) + bonus(b) : null), 4, used);
-    up = pickBooks(cands, (b) => (b.age > base + 0.5 && b.age <= base + 2.5 ? Math.abs(b.age - (base + 1.5)) + bonus(b) : null), 4, used);
-    if (same.length < 4) same.push(...pickBooks(cands, (b) => Math.abs(b.age - base), 4 - same.length, used));
-    if (up.length < 4) up.push(...pickBooks(cands, (b) => (b.age > base ? b.age - base : null), 4 - up.length, used));
+    same = pickBooks(cands, (b) => (Math.abs(b.age - base) <= 0.75 + slack(b) ? Math.abs(b.age - base) + bonus(b) : null), N, used);
+    up = pickBooks(cands, (b) => (b.age > base + 0.5 && b.age <= base + 2.5 ? Math.abs(b.age - (base + 1.5)) + bonus(b) : null), N, used);
+    if (same.length < N) same.push(...pickBooks(cands, (b) => Math.abs(b.age - base), N - same.length, used));
+    if (up.length < N) up.push(...pickBooks(cands, (b) => (b.age > base ? b.age - base : null), N - up.length, used));
     note = avg == null ? 'まだ日本語の記録がないので、小さい子に人気の絵本を選びました。'
       : `最近読んでいる日本語の本は「${ageText('', jaAgeNum(Math.round(avg)))}」向けくらい。それをもとに選びました。`;
   }
 
-  $('#recoNote').textContent = note;
-  const card = (b) => recoCard(b, rel(b).why);
-  $('#recoSame').innerHTML = same.map(card).join('');
-  $('#recoUp').innerHTML = up.map(card).join('') || '<p class="muted small">今のところ、これより上のおすすめはありません。</p>';
-  [...same, ...up].forEach((b) => {
-    if (cachedCover(b.pid) !== undefined) return;
-    fetchPresetCover(b).then((url) => {
-      if (!url) { markCover(b.pid, 0); return; }
-      document.querySelectorAll(`.reco-img[data-pid="${b.pid}"]`).forEach((el) => { el.innerHTML = recoCover(url, b); });
-    });
-  });
+  return { same, up, note, rel };
 }
 
 // タイトルの「#3」などの巻数
@@ -762,18 +776,37 @@ function renderSearchEmpty() {
   const pick = (isbn) => PRESET_BOOKS.find((b) => b.isbn === isbn) || enLibBook(isbn);
   const ja = JA.map(pick).filter((b) => b && langOk('ja')), en = EN.map(pick).filter((b) => b && langOk('en'));
   const n = ja.length && en.length ? 3 : 6;
-  const last10 = logsFor().slice().sort((x, y) => (y.date || '').localeCompare(x.date || '') || (y.updatedAt || 0) - (x.updatedAt || 0)).slice(0, 10);
-  const enFirst = last10.filter((l) => l.lang === 'en').length > last10.filter((l) => l.lang === 'ja').length;
   const groups = [['日本語', ja.slice(0, n)], ['英語', en.slice(0, n)]].filter(([, list]) => list.length);
-  if (enFirst) groups.reverse();
+  if (enFirst()) groups.reverse();
   const popular = groups.flatMap(([, list]) => list);
   if (!enLibReady() && langOk('en')) loadEnLib().then(() => { if ($('#addDlg').open && !$('#searchInput').value.trim()) renderSearchEmpty(); });
+  // 次に読みそうな本：最近読んだシリーズの、まだ読んでいない本（新しく読んだシリーズから順に）
+  // シリーズ内は巻数（#3 など）、なければリストの並び順で、最後に読んだ本の次から探す
+  const logsAll = logsFor().slice().sort((x, y) => (y.date || '').localeCompare(x.date || '') || (y.updatedAt || 0) - (x.updatedAt || 0));
+  const readP = new Set(logsAll.map((l) => l.pid).filter(Boolean)), readI = new Set(logsAll.map((l) => l.isbn).filter(Boolean));
+  const isRead = (b) => (b.pid && readP.has(b.pid)) || (b.isbn && readI.has(b.isbn));
+  const seriesOf = (l) => ((l.pid && PRESET_BOOKS.find((b) => b.pid === l.pid)) || (l.isbn && (PRESET_BOOKS.find((b) => b.isbn === l.isbn) || enLibBook(l.isbn))) || {}).series;
+  const order = [];
+  for (const l of logsAll.slice(0, 30)) { const sr = seriesOf(l); if (sr && !order.includes(sr)) order.push(sr); }
+  const nexts = [];
+  for (const sr of order) {
+    // 作者名がシリーズ名の代わりに入っている本（シリーズではない）は除く
+    let list = [...PRESET_BOOKS.filter((b) => b.series === sr && !(b.author && norm(b.author).includes(norm(sr)))), ...enLibSeries(sr)].filter((b, i, all) => langOk(b.lang) && all.findIndex((x) => x.isbn === b.isbn) === i);
+    if (list.length < 2) continue;
+    if (list.every((b) => volNum(b) != null)) list.sort((x, y) => volNum(x) - volNum(y));
+    let last = -1; list.forEach((b, i) => { if (isRead(b)) last = i; });
+    const nx = [...list.slice(last + 1), ...list.slice(0, last + 1)].find((b) => !isRead(b) && !nexts.includes(b));
+    if (nx) nexts.push(nx);
+    if (nexts.length >= 6) break;
+  }
+  if (nexts.length) { groups.length = 0; groups.push(['next', nexts]); }
+  popular.length = 0; popular.push(...groups.flatMap(([, list]) => list));
   let html = '';
   if (recent.length) {
     html += '<div class="res-label">🔁 最近読んだ本（もう一度読んだ時に）</div>' +
       recent.map((l) => itemHtml({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid, exact: true }, 'r')).join('');
   }
-  for (const [name, list] of groups) html += `<div class="res-label">⭐ 人気の${name}の本</div>` + list.map((b) => itemHtml(b, 'p')).join('');
+  for (const [name, list] of groups) html += `<div class="res-label">${name === 'next' ? '📚 次に読みそうな本（読んでいるシリーズから）' : `⭐ 人気の${name}の本`}</div>` + list.map((b) => itemHtml(b, 'p')).join('');
   setResults(html, [...recent.map((l) => ({ title: l.title, author: l.author, cover: l.cover, lang: l.lang, count: l.count, isbn: l.isbn, pid: l.pid, exact: true })), ...popular]);
 }
 
@@ -1336,7 +1369,6 @@ function bind() {
   $('#enChart').addEventListener('pointermove', showChartTip);
   $('#enChart').addEventListener('click', showChartTip);
   $('#enChart').addEventListener('pointerleave', () => { $('#chartTip').hidden = true; });
-  $('#recoTabs').addEventListener('change', (e) => { recoLang = e.target.value; renderReco(); });
   $('#shareOpen').onclick = () => openShare();
   $('#shareKinds').addEventListener('change', (e) => { shareKind = e.target.value; drawShare(); });
   $('#shareAge').onchange = () => { state.settings.shareShowAge = $('#shareAge').checked; saveLocal(state); drawShare(); };
