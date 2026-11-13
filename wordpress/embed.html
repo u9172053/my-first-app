@@ -1,7 +1,9 @@
 <!--
-  WordPress の固定ページ（クラシックエディタ）の「コード」タブに、下の2行をまるごと貼り付けてください（貼ったあと「ビジュアル」タブに切り替えないこと）。
-  アプリを画面いっぱいに表示し、ブログのヘッダー・タイトル・下のメニューなどの上に重ねて、アプリだけが見えるようにします。
+  WordPress の固定ページ（クラシックエディタ）の「コード」タブに、下の3行をまるごと貼り付けてください（貼ったあと「ビジュアル」タブに切り替えないこと）。
+  1行目：アプリを画面いっぱいに表示し、ブログのヘッダー・タイトル・下のメニューなどの上に重ねて、アプリだけが見えるようにします。
+  3行目：ホーム画面に追加したときのアイコン・名前を、ブログのものではなく「多読きろく帳」にします（このページだけ）。
   アプリ本体は同じサーバーの /tadoku-app/ に置きます（ConoHa WING のファイルマネージャーでアップロード）。
 -->
 <style>html,body{overflow:hidden!important;height:100%!important}#tadoku-frame{position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;border:0;margin:0;z-index:2147483647;background:#fff8ee}</style>
 <iframe id="tadoku-frame" src="https://www.ouchieigo-club.com/tadoku-app/" title="多読きろく帳" allow="camera; web-share; clipboard-write"></iframe>
+<script>(function(){var A='https://www.ouchieigo-club.com/tadoku-app/',h=document.head;h.querySelectorAll('link[rel~="icon"],link[rel="apple-touch-icon"],link[rel="manifest"],meta[name="apple-mobile-web-app-title"],meta[name="theme-color"]').forEach(function(e){e.remove();});[['link',{rel:'manifest',href:A+'home-manifest.json'}],['link',{rel:'apple-touch-icon',href:A+'assets/apple-touch-icon.png'}],['link',{rel:'icon',type:'image/png',sizes:'192x192',href:A+'assets/icon-192.png'}],['meta',{name:'apple-mobile-web-app-title',content:'多読きろく帳'}],['meta',{name:'apple-mobile-web-app-capable',content:'yes'}],['meta',{name:'theme-color',content:'#fff8ee'}]].forEach(function(x){var e=document.createElement(x[0]);for(var k in x[1])e.setAttribute(k,x[1][k]);h.appendChild(e);});document.title='多読きろく帳';})();</script>

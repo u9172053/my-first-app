@@ -1,0 +1,14 @@
+{
+  "name": "多読きろく帳",
+  "short_name": "多読きろく帳",
+  "start_url": "https://www.ouchieigo-club.com/tadoku/",
+  "scope": "https://www.ouchieigo-club.com/tadoku/",
+  "display": "standalone",
+  "background_color": "#fff8ee",
+  "theme_color": "#fff8ee",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
